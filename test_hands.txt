@@ -1,0 +1,76 @@
+﻿PokerStars Hand #249638850870:  Hold'em No Limit ($0.01/$0.02 USD) - 2024/03/26 22:02:04 CET [2024/03/26 17:02:04 ET]
+Table 'Ostara III' 6-max Seat #2 is the button
+Seat 1: sidneivl ($3.24 in chips) 
+Seat 2: Savva08 ($1.96 in chips) 
+Seat 3: captelie52 ($0.70 in chips) 
+Seat 4: PokerZhyte ($2 in chips) 
+Seat 5: alencarbrasil19 ($1.59 in chips) 
+Seat 6: Cazunga ($2 in chips) 
+captelie52: posts small blind $0.01
+PokerZhyte: posts big blind $0.02
+*** HOLE CARDS ***
+Dealt to PokerZhyte [2c 7d]
+alencarbrasil19: calls $0.02
+Cazunga: folds 
+sidneivl: folds 
+Savva08: folds 
+captelie52: calls $0.01
+PokerZhyte: checks 
+*** FLOP *** [Qh 9s 3d]
+captelie52: checks 
+PokerZhyte: checks 
+alencarbrasil19: checks 
+*** TURN *** [Qh 9s 3d] [6s]
+captelie52: checks 
+PokerZhyte: checks 
+alencarbrasil19: bets $0.18
+captelie52: folds 
+PokerZhyte: folds 
+Uncalled bet ($0.18) returned to alencarbrasil19
+alencarbrasil19 collected $0.06 from pot
+alencarbrasil19: doesn't show hand 
+*** SUMMARY ***
+Total pot $0.06 | Rake $0 
+Board [Qh 9s 3d 6s]
+Seat 1: sidneivl folded before Flop (didn't bet)
+Seat 2: Savva08 (button) folded before Flop (didn't bet)
+Seat 3: captelie52 (small blind) folded on the Turn
+Seat 4: PokerZhyte (big blind) folded on the Turn
+Seat 5: alencarbrasil19 collected ($0.06)
+Seat 6: Cazunga folded before Flop (didn't bet)
+
+
+
+PokerStars Hand #249638867813:  Hold'em No Limit ($0.01/$0.02 USD) - 2024/03/26 22:02:57 CET [2024/03/26 17:02:57 ET]
+Table 'Ostara III' 6-max Seat #3 is the button
+Seat 1: sidneivl ($3.24 in chips) 
+Seat 2: Savva08 ($1.96 in chips) 
+Seat 3: captelie52 ($0.68 in chips) 
+Seat 4: PokerZhyte ($2 in chips) 
+Seat 5: alencarbrasil19 ($1.63 in chips) 
+Seat 6: Cazunga ($2 in chips) 
+PokerZhyte: posts small blind $0.01
+alencarbrasil19: posts big blind $0.02
+*** HOLE CARDS ***
+Dealt to PokerZhyte [4c 6h]
+Cazunga: folds 
+sidneivl: folds 
+Savva08: raises $0.04 to $0.06
+captelie52: calls $0.06
+PokerZhyte: folds 
+alencarbrasil19: folds 
+*** FLOP *** [Th 5h Jc]
+Savva08: bets $0.07
+captelie52: folds 
+Uncalled bet ($0.07) returned to Savva08
+Savva08 collected $0.14 from pot
+Savva08: doesn't show hand 
+*** SUMMARY ***
+Total pot $0.15 | Rake $0.01 
+Board [Th 5h Jc]
+Seat 1: sidneivl folded before Flop (didn't bet)
+Seat 2: Savva08 collected ($0.14)
+Seat 3: captelie52 (button) folded on the Flop
+Seat 4: PokerZhyte (small blind) folded before Flop
+Seat 5: alencarbrasil19 (big blind) folded before Flop
+Seat 6: Cazunga folded before Flop (didn't bet)
