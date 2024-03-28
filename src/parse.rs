@@ -115,9 +115,9 @@ fn preflop(hand: &mut Hand, lines: &mut Lines) {
             split.next().unwrap();
             split.next().unwrap();
             split.next().unwrap();
-            hand.players_card[hand.player_position as usize][0] =
+            hand.players_card[hand.player_position as usize - 1][0] =
                 split.next().unwrap().replace('[', "");
-            hand.players_card[hand.player_position as usize][1] =
+            hand.players_card[hand.player_position as usize - 1][1] =
                 split.next().unwrap().replace(']', "");
         } else if Action::is_action(line) {
             // actions
@@ -258,16 +258,16 @@ impl Action {
         match line[1] {
             "calls" => Action::Call(
                 hand.get_player(&line[0].replace(':', "")),
-                line[2].parse::<f64>().unwrap(),
+                line[2].replace('$', "").parse::<f64>().unwrap(),
             ),
             "bets" => Action::Bet(
                 hand.get_player(&line[0].replace(':', "")),
-                line[2].parse::<f64>().unwrap(),
+                line[2].replace('$', "").parse::<f64>().unwrap(),
             ),
             "raises" => Action::Raise(
                 hand.get_player(&line[0].replace(':', "")),
-                line[2].parse::<f64>().unwrap(),
-                line[4].parse::<f64>().unwrap(),
+                line[2].replace('$', "").parse::<f64>().unwrap(),
+                line[4].replace('$', "").parse::<f64>().unwrap(),
             ),
             "checks" => Action::Check(hand.get_player(&line[0].replace(':', ""))),
             "folds" => Action::Fold(hand.get_player(&line[0].replace(':', ""))),
@@ -357,6 +357,127 @@ PokerZhyte: posts big blind $0.02"
             player_position: 3,
             ..Default::default()
         };
+        assert_eq!(actual_hand, expected_hand);
+    }
+
+    #[test]
+    fn test_preflop() {
+        // TODO : add uncalled bet
+        let mut input = "Dealt to PokerZhyte [2c 7d]
+alencarbrasil19: calls $0.02
+Cazunga: folds 
+sidneivl: folds 
+Savva08: folds 
+captelie52: calls $0.01
+PokerZhyte: checks"
+            .lines();
+        let mut actual_hand = Hand {
+            small_blind: Blind {
+                player: Player {
+                    name: "captelie52".to_string(),
+                    position: 3,
+                },
+                amount: 0.01,
+            },
+            big_blind: Blind {
+                player: Player {
+                    name: "PokerZhyte".to_string(),
+                    position: 4,
+                },
+                amount: 0.02,
+            },
+            players: [
+                Player {
+                    name: "sidneivl".to_string(),
+                    position: 1,
+                },
+                Player {
+                    name: "Savva08".to_string(),
+                    position: 2,
+                },
+                Player {
+                    name: "captelie52".to_string(),
+                    position: 3,
+                },
+                Player {
+                    name: "PokerZhyte".to_string(),
+                    position: 4,
+                },
+                Player {
+                    name: "alencarbrasil19".to_string(),
+                    position: 5,
+                },
+                Player {
+                    name: "Cazunga".to_string(),
+                    position: 6,
+                },
+            ],
+            player_position: 3,
+            ..Default::default()
+        };
+        preflop(&mut actual_hand, &mut input);
+        let players = [
+            Player {
+                name: "sidneivl".to_string(),
+                position: 1,
+            },
+            Player {
+                name: "Savva08".to_string(),
+                position: 2,
+            },
+            Player {
+                name: "captelie52".to_string(),
+                position: 3,
+            },
+            Player {
+                name: "PokerZhyte".to_string(),
+                position: 4,
+            },
+            Player {
+                name: "alencarbrasil19".to_string(),
+                position: 5,
+            },
+            Player {
+                name: "Cazunga".to_string(),
+                position: 6,
+            },
+        ];
+        let expected_hand = Hand {
+            small_blind: Blind {
+                player: Player {
+                    name: "captelie52".to_string(),
+                    position: 3,
+                },
+                amount: 0.01,
+            },
+            big_blind: Blind {
+                player: Player {
+                    name: "PokerZhyte".to_string(),
+                    position: 4,
+                },
+                amount: 0.02,
+            },
+            players: players.clone(),
+            player_position: 3,
+            players_card: [
+                [String::new(), String::new()],
+                [String::new(), String::new()],
+                [String::from("2c"), String::from("7d")],
+                [String::new(), String::new()],
+                [String::new(), String::new()],
+                [String::new(), String::new()],
+            ],
+            preflop: vec![
+                Action::Call(players[4].clone(), 0.02),
+                Action::Fold(players[5].clone()),
+                Action::Fold(players[0].clone()),
+                Action::Fold(players[1].clone()),
+                Action::Call(players[2].clone(), 0.01),
+                Action::Check(players[3].clone()),
+            ],
+            ..Default::default()
+        };
+
         assert_eq!(actual_hand, expected_hand);
     }
 
