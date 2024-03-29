@@ -182,7 +182,7 @@ fn river(hand: &mut Hand, lines: &mut Lines) {
 #[derive(Default, Debug, PartialEq)]
 struct Hand {
     content: String,
-    table: String, // TODO: empty
+    table: String, // TODO: empty + hand id
     date: NaiveDateTime,
     players: [Player; 6],
     players_card: [[String; 2]; 6],
