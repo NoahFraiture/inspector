@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use chrono::DateTime;
+use chrono::{DateTime, NaiveDateTime};
+use regex::Regex;
 use std::env;
 use std::fs;
 use std::io::{self, stdin, BufReader, BufWriter, Stdout};
@@ -8,15 +9,17 @@ use std::str::Lines;
 
 pub fn parse() {
     let filepath = "/home/noah/Games/poker_logs/PokerZhyte/HH20240326 Cornelia III - $0.01-$0.02 - USD No Limit Hold'em.txt";
-    let filecontent = fs::read_to_string(filepath).expect("Invalid file");
+    let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
+    filecontent = filecontent.replace('\r', "");
+    filecontent = filecontent.replace('\u{feff}', "");
 
-    let hands = get_hands(&filecontent);
+    let hands = split_hands_content(&filecontent);
     for hand in hands {
         println!("{}", &hand[0..50]);
     }
 }
 
-fn get_hands(content: &str) -> Vec<String> {
+fn split_hands_content(content: &str) -> Vec<String> {
     let mut current_hand = String::new();
     let mut hands = Vec::new();
     for line in content.lines() {
@@ -36,24 +39,26 @@ fn get_hands(content: &str) -> Vec<String> {
 
 // Suppose that the table is 6 person
 // Can use regex in future
-fn parse_hand(hand_txt: &str, username: &str) -> Hand {
+fn parse_hand(hand_txt: &str) -> Hand {
     let mut hand = Hand {
         content: hand_txt.to_string(),
-        username: username.to_string(),
         ..Default::default()
     };
     let mut lines = hand_txt.lines();
 
     // extract date
-    let mut date_str = lines.next().unwrap().split('[');
-    let day_str = date_str.next().unwrap();
-    let hour_str = date_str.next().unwrap();
-    let mut date_string = String::new();
-    date_string.push_str(day_str);
-    date_string.push_str(hour_str);
-    hand.date = DateTime::parse_from_str(&date_string, "%Y-%m-%d %H:%M:%S").unwrap(); // ET hour
+    let re = Regex::new(r"\[(.*?)\]").unwrap();
+    let first_line = lines.next().unwrap();
+    let capture = re.captures(first_line).unwrap();
+    let date_string = capture[0].to_string();
+    // TODO : set offset to ET
+    let date = NaiveDateTime::parse_from_str(&date_string, "[%Y/%m/%d %H:%M:%S ET]");
+    match date {
+        Ok(date) => hand.date = date,
+        Err(e) => println!("Error parsing date: {}", e),
+    }
 
-    start(&mut hand, &mut lines, username);
+    start(&mut hand, &mut lines);
     preflop(&mut hand, &mut lines);
     flop(&mut hand, &mut lines);
     turn(&mut hand, &mut lines);
@@ -62,7 +67,7 @@ fn parse_hand(hand_txt: &str, username: &str) -> Hand {
     hand
 }
 
-fn start(hand: &mut Hand, lines: &mut Lines, username: &str) {
+fn start(hand: &mut Hand, lines: &mut Lines) {
     for line in lines {
         let mut split = line.split_whitespace();
         if line.contains("posts small blind") {
@@ -97,9 +102,6 @@ fn start(hand: &mut Hand, lines: &mut Lines, username: &str) {
                 name: split.next().unwrap().to_string(),
                 position: position as u8,
             };
-            if player.name == username {
-                hand.player_position = position as u8 - 1;
-            }
             hand.players[position - 1] = player;
         } else if line == "*** HOLE CARDS ***" {
             return;
@@ -114,10 +116,12 @@ fn preflop(hand: &mut Hand, lines: &mut Lines) {
             // user cards
             split.next().unwrap();
             split.next().unwrap();
-            split.next().unwrap();
-            hand.players_card[hand.player_position as usize - 1][0] =
+            let username = split.next().unwrap();
+            let player = hand.get_player(username);
+
+            hand.players_card[player.position as usize - 1][0] =
                 split.next().unwrap().replace('[', "");
-            hand.players_card[hand.player_position as usize - 1][1] =
+            hand.players_card[player.position as usize - 1][1] =
                 split.next().unwrap().replace(']', "");
         } else if Action::is_action(line) {
             // actions
@@ -134,10 +138,12 @@ fn preflop(hand: &mut Hand, lines: &mut Lines) {
 
 // TODO : refactor to avoid duplicate
 fn flop(hand: &mut Hand, lines: &mut Lines) {
-    for line in lines {
+    while let Some(line) = lines.next() {
         if Action::is_action(line) {
             hand.flop
                 .push(Action::get_action(hand, line.split_whitespace().collect()));
+        } else if line.starts_with("Uncalled bet") {
+            hand.end = End::extract_end(hand, line, lines.next().unwrap());
         } else if line.starts_with("*** TURN ***") {
             // TODO : add turn cards
             return;
@@ -146,10 +152,12 @@ fn flop(hand: &mut Hand, lines: &mut Lines) {
 }
 
 fn turn(hand: &mut Hand, lines: &mut Lines) {
-    for line in lines {
+    while let Some(line) = lines.next() {
         if Action::is_action(line) {
             hand.turn
                 .push(Action::get_action(hand, line.split_whitespace().collect()));
+        } else if line.starts_with("Uncalled bet") {
+            hand.end = End::extract_end(hand, line, lines.next().unwrap());
         } else if line.starts_with("*** RIVER ***") {
             // TODO : add river cards
             break;
@@ -158,10 +166,12 @@ fn turn(hand: &mut Hand, lines: &mut Lines) {
 }
 
 fn river(hand: &mut Hand, lines: &mut Lines) {
-    for line in lines {
+    while let Some(line) = lines.next() {
         if Action::is_action(line) {
             hand.river
                 .push(Action::get_action(hand, line.split_whitespace().collect()));
+        } else if line.starts_with("Uncalled bet") {
+            hand.end = End::extract_end(hand, line, lines.next().unwrap());
         } else if line.starts_with("*** SHOW DOWN ***") {
             // TODO : add river cards
             return;
@@ -172,10 +182,8 @@ fn river(hand: &mut Hand, lines: &mut Lines) {
 #[derive(Default, Debug, PartialEq)]
 struct Hand {
     content: String,
-    table: String,
-    username: String,
-    date: DateTime<chrono::FixedOffset>,
-    player_position: u8,
+    table: String, // TODO: empty
+    date: NaiveDateTime,
     players: [Player; 6],
     players_card: [[String; 2]; 6],
     small_blind: Blind,
@@ -185,7 +193,6 @@ struct Hand {
     turn: Vec<Action>,
     river: Vec<Action>,
     end: End,
-    show: Vec<Player>,
 }
 
 impl Hand {
@@ -204,14 +211,15 @@ impl Hand {
 struct End {
     pot: f64,
     winner: Player,
-    uncalled_bet: f64,
+    uncalled_bet: f64, // value of the bet where every one fold. WARN: consider remove
 }
 
 impl End {
     fn extract_end(hand: &Hand, first_line: &str, second_line: &str) -> Self {
         let mut first_split = first_line.split_whitespace();
         let mut second_split = second_line.split_whitespace();
-        first_split.next(); // "Uncalled bet"
+        first_split.next(); // "Uncalled"
+        first_split.next(); // "bet"
         let uncalled_bet = first_split
             .next()
             .unwrap()
@@ -298,6 +306,7 @@ struct Win {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::{assert_eq, assert_ne};
 
     #[test]
     fn test_start() {
@@ -312,7 +321,7 @@ captelie52: posts small blind $0.01
 PokerZhyte: posts big blind $0.02"
             .lines();
         let mut actual_hand = Hand::default();
-        start(&mut actual_hand, &mut input, "PokerZhyte");
+        start(&mut actual_hand, &mut input);
         let expected_hand = Hand {
             small_blind: Blind {
                 player: Player {
@@ -354,7 +363,6 @@ PokerZhyte: posts big blind $0.02"
                     position: 6,
                 },
             ],
-            player_position: 3,
             ..Default::default()
         };
         assert_eq!(actual_hand, expected_hand);
@@ -412,7 +420,6 @@ PokerZhyte: checks"
                     position: 6,
                 },
             ],
-            player_position: 3,
             ..Default::default()
         };
         preflop(&mut actual_hand, &mut input);
@@ -458,12 +465,11 @@ PokerZhyte: checks"
                 amount: 0.02,
             },
             players: players.clone(),
-            player_position: 3,
             players_card: [
                 [String::new(), String::new()],
                 [String::new(), String::new()],
-                [String::from("2c"), String::from("7d")],
                 [String::new(), String::new()],
+                [String::from("2c"), String::from("7d")],
                 [String::new(), String::new()],
                 [String::new(), String::new()],
             ],
@@ -482,10 +488,218 @@ PokerZhyte: checks"
     }
 
     #[test]
-    fn test_get_hands() {
+    fn test_flop() {
+        let mut input = "Savva08: bets $0.07
+captelie52: folds 
+Uncalled bet ($0.07) returned to Savva08
+Savva08 collected $0.14 from pot
+Savva08: doesn't show hand"
+            .lines();
+        let mut actual_hand = Hand {
+            small_blind: Blind {
+                player: Player {
+                    name: String::from("PokerZhyte"),
+                    position: 4,
+                },
+                amount: 0.1,
+            },
+            big_blind: Blind {
+                player: Player {
+                    name: String::from("alencarbrasil19"),
+                    position: 5,
+                },
+                amount: 0.2,
+            },
+            players: [
+                Player {
+                    name: String::from("sidneivl"),
+                    position: 1,
+                },
+                Player {
+                    name: String::from("Savva08"),
+                    position: 2,
+                },
+                Player {
+                    name: String::from("captelie52"),
+                    position: 3,
+                },
+                Player {
+                    name: String::from("PokerZhyte"),
+                    position: 4,
+                },
+                Player {
+                    name: String::from("alencarbrasil19"),
+                    position: 5,
+                },
+                Player {
+                    name: String::from("Cazunga"),
+                    position: 6,
+                },
+            ],
+            ..Default::default()
+        };
+        flop(&mut actual_hand, &mut input);
+        let expected_hand = Hand {
+            small_blind: Blind {
+                player: Player {
+                    name: String::from("PokerZhyte"),
+                    position: 4,
+                },
+                amount: 0.1,
+            },
+            big_blind: Blind {
+                player: Player {
+                    name: String::from("alencarbrasil19"),
+                    position: 5,
+                },
+                amount: 0.2,
+            },
+            players: [
+                Player {
+                    name: "sidneivl".to_string(),
+                    position: 1,
+                },
+                Player {
+                    name: "Savva08".to_string(),
+                    position: 2,
+                },
+                Player {
+                    name: "captelie52".to_string(),
+                    position: 3,
+                },
+                Player {
+                    name: "PokerZhyte".to_string(),
+                    position: 4,
+                },
+                Player {
+                    name: "alencarbrasil19".to_string(),
+                    position: 5,
+                },
+                Player {
+                    name: "Cazunga".to_string(),
+                    position: 6,
+                },
+            ],
+            flop: vec![
+                Action::Bet(
+                    Player {
+                        name: "Savva08".to_string(),
+                        position: 2,
+                    },
+                    0.07,
+                ),
+                Action::Fold(Player {
+                    name: "captelie52".to_string(),
+                    position: 3,
+                }),
+            ],
+            end: End {
+                winner: Player {
+                    name: "Savva08".to_string(),
+                    position: 2,
+                },
+                pot: 0.14,
+                uncalled_bet: 0.07,
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(actual_hand, expected_hand);
+    }
+
+    #[test]
+    fn test_parsing() {
+        let filepath = "test_hands.txt";
+        let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
+        filecontent = filecontent.replace('\r', "");
+        filecontent = filecontent.replace('\u{feff}', "");
+        let hands_content = split_hands_content(&filecontent);
+        let actual_hand = parse_hand(&hands_content[0]);
+
+        let players = [
+            Player {
+                name: "sidneivl".to_string(),
+                position: 1,
+            },
+            Player {
+                name: "Savva08".to_string(),
+                position: 2,
+            },
+            Player {
+                name: "captelie52".to_string(),
+                position: 3,
+            },
+            Player {
+                name: "PokerZhyte".to_string(),
+                position: 4,
+            },
+            Player {
+                name: "alencarbrasil19".to_string(),
+                position: 5,
+            },
+            Player {
+                name: "Cazunga".to_string(),
+                position: 6,
+            },
+        ];
+        let expected_hand = Hand {
+            table: "".to_string(),
+            content: hands_content[0].clone(),
+            small_blind: Blind {
+                player: players[2].clone(),
+                amount: 0.01,
+            },
+            big_blind: Blind {
+                player: players[3].clone(),
+                amount: 0.02,
+            },
+            date: NaiveDateTime::parse_from_str("2024/03/26 17:02:04", "%Y/%m/%d %H:%M:%S")
+                .unwrap(),
+            end: End {
+                pot: 0.06,
+                winner: players[4].clone(),
+                uncalled_bet: 0.18,
+            },
+            players: players.clone(),
+            players_card: [
+                ["".to_string(), "".to_string()],
+                ["".to_string(), "".to_string()],
+                ["".to_string(), "".to_string()],
+                ["2c".to_string(), "7d".to_string()],
+                ["".to_string(), "".to_string()],
+                ["".to_string(), "".to_string()],
+            ],
+            preflop: vec![
+                Action::Call(players[4].clone(), 0.02),
+                Action::Fold(players[5].clone()),
+                Action::Fold(players[0].clone()),
+                Action::Fold(players[1].clone()),
+                Action::Call(players[2].clone(), 0.01),
+                Action::Check(players[3].clone()),
+            ],
+            flop: vec![
+                Action::Check(players[2].clone()),
+                Action::Check(players[3].clone()),
+                Action::Check(players[4].clone()),
+            ],
+            turn: vec![
+                Action::Check(players[2].clone()),
+                Action::Check(players[3].clone()),
+                Action::Bet(players[4].clone(), 0.18),
+                Action::Fold(players[2].clone()),
+                Action::Fold(players[3].clone()),
+            ],
+            river: vec![],
+        };
+
+        assert_eq!(actual_hand, expected_hand);
+    }
+
+    #[test]
+    fn test_split_hands_content() {
         let filepath = "test_hands.txt";
         let filecontent = fs::read_to_string(filepath).expect("Invalid file");
-        let actual_hands: Vec<String> = get_hands(&filecontent);
+        let actual_hands: Vec<String> = split_hands_content(&filecontent);
 
         let expected_hands: [&str; 2] = ["PokerStars Hand #249638850870:  Hold'em No Limit ($0.01/$0.02 USD) - 2024/03/26 22:02:04 CET [2024/03/26 17:02:04 ET]
 Table 'Ostara III' 6-max Seat #2 is the button
