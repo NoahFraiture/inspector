@@ -50,6 +50,7 @@ CREATE TABLE Hand(
   player6 TEXT REFERENCES Player(name),
   player7 TEXT REFERENCES Player(name),
   player8 TEXT REFERENCES Player(name),
+  player9 TEXT REFERENCES Player(name),
   card1 TEXT,
   card2 TEXT,
   card3 TEXT,
