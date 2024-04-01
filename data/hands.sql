@@ -1,3 +1,25 @@
+DROP TABLE IF EXISTS Hand;
+CREATE TABLE Hand(
+  id INT PRIMARY KEY,
+  time INT NOT NULL, -- timestamp
+  table_name TEXT NOT NULL,
+  table_size INT NOT NULL,
+  player1 TEXT REFERENCES Player(name), -- number are the position at the table starting at UTG
+  player2 TEXT REFERENCES Player(name),
+  player3 TEXT REFERENCES Player(name),
+  player4 TEXT REFERENCES Player(name),
+  player5 TEXT REFERENCES Player(name),
+  player6 TEXT REFERENCES Player(name),
+  player7 TEXT REFERENCES Player(name),
+  player8 TEXT REFERENCES Player(name),
+  player9 TEXT REFERENCES Player(name),
+  card1 TEXT,
+  card2 TEXT,
+  card3 TEXT,
+  card4 TEXT,
+  card5 TEXT
+);
+
 DROP TABLE IF EXISTS Player;
 CREATE TABLE Player(
   name TEXT PRIMARY KEY
@@ -35,29 +57,3 @@ CREATE TABLE Action(
   amount2 INT,
   UNIQUE(hand, moment, sequence)
 );
-
-DROP TABLE IF EXISTS Hand;
-CREATE TABLE Hand(
-  id INT PRIMARY KEY,
-  time INT NOT NULL, -- timestamp
-  table_name TEXT NOT NULL,
-  table_size INT NOT NULL,
-  player1 TEXT REFERENCES Player(name), -- number are the position at the table starting at UTG
-  player2 TEXT REFERENCES Player(name),
-  player3 TEXT REFERENCES Player(name),
-  player4 TEXT REFERENCES Player(name),
-  player5 TEXT REFERENCES Player(name),
-  player6 TEXT REFERENCES Player(name),
-  player7 TEXT REFERENCES Player(name),
-  player8 TEXT REFERENCES Player(name),
-  player9 TEXT REFERENCES Player(name),
-  card1 TEXT,
-  card2 TEXT,
-  card3 TEXT,
-  card4 TEXT,
-  card5 TEXT
-);
-
-
-
-

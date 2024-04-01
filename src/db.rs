@@ -44,8 +44,8 @@ impl HandDB {
         Result::Ok(HandDB { connection })
     }
 
-    pub fn insert(&self, hand: &Hand) {
-        let hand_table_query = format!(
+    pub fn insert(&self, hand: &Hand) -> Result<()> {
+        let hand_query = format!(
             "INSERT INTO Hand VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
             hand.id,
             hand.date.timestamp(),
@@ -66,5 +66,39 @@ impl HandDB {
             get_card(&hand.turn_card),
             get_card(&hand.river_card),
         );
+        let result = self.connection.execute(&hand_query, ());
+        match result {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
+
+        // WARN: may restart player
+        for i in 0..9 {
+            if let Some(player) = &hand.players[i] {
+                // Player table
+                let player_query = format!("INSERT INTO Player Values ({})", player.name);
+                match self.connection.execute(&player_query, ()) {
+                    Ok(_) => {}
+                    Err(e) => return Err(e),
+                }
+
+                // HoldCard table
+                if let Some(cards) = &hand.players_card[i] {
+                    // HoldCard table
+                    let hole_card_query = format!(
+                        "INSERT INTO HoleCard Values ({}, {}, {}, {})",
+                        hand.id, player.name, cards[0], cards[1]
+                    );
+                    match self.connection.execute(&hole_card_query, ()) {
+                        Ok(_) => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+
+                // TODO: next tables
+            }
+        }
+
+        Ok(())
     }
 }
