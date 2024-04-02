@@ -71,6 +71,16 @@ fn start(hand: &mut Hand, lines: &mut Lines) {
     let offset = FixedOffset::east_opt(5 * 3600).unwrap();
     hand.date = DateTime::<FixedOffset>::from_naive_utc_and_offset(date.unwrap(), offset);
 
+    // extract limits
+    let re = Regex::new(r"\$(\d*\.)?\d+").unwrap();
+    let mut matches = re.find_iter(first_line);
+    let mut small_limit = matches.next().unwrap().as_str().chars();
+    let mut big_limit = matches.next().unwrap().as_str().chars();
+    small_limit.next();
+    big_limit.next();
+    hand.small_limit = small_limit.as_str().parse::<f64>().unwrap();
+    hand.big_limit = big_limit.as_str().parse::<f64>().unwrap();
+
     let second_line = lines.next().unwrap();
 
     // extract table name
@@ -242,11 +252,44 @@ fn river(hand: &mut Hand, lines: &mut Lines) {
     }
 }
 
+// TEST:
+fn showdonw(hand: &mut Hand, lines: &mut Lines) {
+    while let Some(line) = lines.next() {
+        let re = Regex::new(r".*:").unwrap();
+        let capture_player = re.captures(line).unwrap();
+        let mut chars = capture_player[0].chars();
+        chars.next_back();
+        let player_name = chars.as_str();
+        let mut position: Option<u8> = None;
+        for i in 0..9 {
+            if let Some(player) = hand.players[i].clone() {
+                if player.name == player_name {
+                    position = Some(i as u8);
+                }
+            }
+        }
+        if let Some(position) = position {
+            let re = Regex::new(r"\[(..)\]").unwrap();
+            let capture_card = re.captures(line).unwrap();
+            let mut chars = capture_card[0].chars();
+            chars.next(); // remove chars [
+            chars.next_back(); // remove chars ]
+            let mut cards = chars.as_str().split_whitespace();
+            hand.players_card[position as usize] = Some([
+                cards.next().unwrap().to_string(),
+                cards.next().unwrap().to_string(),
+            ]);
+        }
+    }
+}
+
 #[derive(Default, Debug, PartialEq)]
 pub struct Hand {
     pub content: String,
     pub id: u64, // u32 is too small
     pub date: DateTime<FixedOffset>,
+    pub small_limit: f64,
+    pub big_limit: f64,
     pub table_name: String,
     pub table_size: u8,
     pub button_position: u8, // usefull to shift position and guess real position
@@ -426,6 +469,8 @@ mod tests {
         let offset = FixedOffset::east_opt(5 * 3600).unwrap();
         let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
         let expected_hand = Hand {
+            small_limit: 0.01,
+            big_limit: 0.02,
             flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
             turn_card: Some("6s".to_string()),
             river_card: None,
