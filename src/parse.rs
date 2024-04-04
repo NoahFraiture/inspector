@@ -72,14 +72,22 @@ fn start(hand: &mut Hand, lines: &mut Lines) {
     hand.date = DateTime::<FixedOffset>::from_naive_utc_and_offset(date.unwrap(), offset);
 
     // extract limits
-    let re = Regex::new(r"\$(\d*\.)?\d+").unwrap();
-    let mut matches = re.find_iter(first_line);
-    let mut small_limit = matches.next().unwrap().as_str().chars();
-    let mut big_limit = matches.next().unwrap().as_str().chars();
-    small_limit.next();
-    big_limit.next();
-    hand.small_limit = small_limit.as_str().parse::<f64>().unwrap();
-    hand.big_limit = big_limit.as_str().parse::<f64>().unwrap();
+    let re = Regex::new(r"\(\$?(\d+\.)?\d+\/\$?(\d+\.)?\d+( USD)?\)").unwrap();
+    let capture_limites = re.captures(first_line).unwrap();
+    let limits_str = capture_limites[0].to_string();
+    let mut chars = limits_str.chars();
+    chars.next();
+    chars.next_back();
+    let mut limits = chars.as_str().split('/');
+    let small_limit_str = limits.next().unwrap();
+    let big_limit_str = limits.next().unwrap();
+
+    hand.small_limit = small_limit_str.replace('$', "").parse::<f64>().unwrap();
+    hand.big_limit = big_limit_str
+        .replace('$', "")
+        .replace(" USD", "")
+        .parse::<f64>()
+        .unwrap();
 
     let second_line = lines.next().unwrap();
 
