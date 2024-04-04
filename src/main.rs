@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
 mod db;
 mod parse;
 use crate::db::HandDB;

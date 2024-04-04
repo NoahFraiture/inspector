@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::parse::Hand;
 use super::parse::Player;
 use rusqlite::{Connection, Result};
