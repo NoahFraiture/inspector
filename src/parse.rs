@@ -323,12 +323,12 @@ pub struct Hand {
     pub players: [Option<Player>; 9],
     pub small_blind: Blind,
     pub big_blind: Blind,
-    end: End,
+    pub end: End, // NOTE: not used
     pub players_card: [Option<[String; 2]>; 9],
-    preflop: Vec<Action>,
-    flop: Vec<Action>,
-    turn: Vec<Action>,
-    river: Vec<Action>,
+    pub preflop: Vec<Action>,
+    pub flop: Vec<Action>,
+    pub turn: Vec<Action>,
+    pub river: Vec<Action>,
     pub flop_card: Option<[String; 3]>,
     pub turn_card: Option<String>,
     pub river_card: Option<String>,
@@ -352,9 +352,9 @@ impl Hand {
 }
 
 #[derive(Default, Debug, PartialEq)]
-struct End {
-    pot: f64,
-    winner: Player,
+pub struct End {
+    pub pot: f64,
+    pub winner: Player,
 }
 
 impl End {
@@ -373,7 +373,7 @@ impl End {
 }
 
 #[derive(Debug, PartialEq)]
-enum Action {
+pub enum Action {
     Call(Player, f64, bool),
     /// is all-in
     Bet(Player, f64, bool),
@@ -435,8 +435,8 @@ pub struct Player {
 
 #[derive(Default, Debug, PartialEq)]
 pub struct Blind {
-    player: Player,
-    amount: f64,
+    pub player: Player,
+    pub amount: f64,
 }
 
 #[cfg(test)]
