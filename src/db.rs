@@ -6,7 +6,7 @@ fn get_name(player: &Option<Player>) -> String {
     if let Some(player) = &player {
         player.name.clone()
     } else {
-        String::from("NULL")
+        String::from("null")
     }
 }
 
@@ -14,7 +14,7 @@ fn get_card(card: &Option<String>) -> String {
     if let Some(card) = &card {
         String::from(card)
     } else {
-        String::from("NULL")
+        String::from("null")
     }
 }
 
@@ -27,9 +27,9 @@ fn get_card_flop(cards: &Option<[String; 3]>) -> [String; 3] {
         ]
     } else {
         [
-            String::from("NULL"),
-            String::from("NULL"),
-            String::from("NULL"),
+            String::from("null"),
+            String::from("null"),
+            String::from("null"),
         ]
     }
 }
@@ -89,7 +89,7 @@ pub struct HandDB {
 
 impl HandDB {
     pub fn new() -> Result<Self> {
-        let connection = Connection::open("data/hand.db")?;
+        let connection = Connection::open("data/hands.db")?;
         Result::Ok(HandDB { connection })
     }
 
@@ -185,4 +185,116 @@ impl HandDB {
 
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::parse::*;
+    use chrono::{DateTime, FixedOffset, NaiveDateTime};
+    use pretty_assertions::assert_eq;
+
+    fn init_hand_real_fold() -> Hand {
+        let players = [
+            Some(Player {
+                name: "sidneivl".to_string(),
+                position: 1,
+                bank: 3.24,
+            }),
+            Some(Player {
+                name: "Savva08".to_string(),
+                position: 2,
+                bank: 1.96,
+            }),
+            Some(Player {
+                name: "captelie52".to_string(),
+                position: 3,
+                bank: 0.70,
+            }),
+            Some(Player {
+                name: "PokerZhyte".to_string(),
+                position: 4,
+                bank: 2.,
+            }),
+            Some(Player {
+                name: "alencarbrasil19".to_string(),
+                position: 5,
+                bank: 1.59,
+            }),
+            Some(Player {
+                name: "Cazunga".to_string(),
+                position: 6,
+                bank: 2.,
+            }),
+            None,
+            None,
+            None,
+        ];
+        let naive_date =
+            NaiveDateTime::parse_from_str("[2024/03/26 17:02:04 ET]", "[%Y/%m/%d %H:%M:%S ET]");
+        let offset = FixedOffset::east_opt(5 * 3600).unwrap();
+        let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
+        Hand {
+            small_limit: 0.01,
+            big_limit: 0.02,
+            flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
+            turn_card: Some("6s".to_string()),
+            river_card: None,
+            // NOTE : since it's not used, set to empty is easier
+            content: String::new(),
+            id: 249638850870,
+            date,
+            table_name: "Ostara III".to_string(),
+            table_size: 6,
+            button_position: 2,
+            players: players.clone(),
+            small_blind: Blind {
+                player: players[2].clone().unwrap(),
+                amount: 0.01,
+            },
+            big_blind: Blind {
+                player: players[3].clone().unwrap(),
+                amount: 0.02,
+            },
+            end: End {
+                pot: 0.06,
+                winner: players[4].clone().unwrap(),
+            },
+            players_card: [
+                None,
+                None,
+                None,
+                Some(["2c".to_string(), "7d".to_string()]),
+                None,
+                None,
+                None,
+                None,
+                None,
+            ],
+            preflop: vec![
+                Action::Call(players[4].clone().unwrap(), 0.02, false),
+                Action::Fold(players[5].clone().unwrap()),
+                Action::Fold(players[0].clone().unwrap()),
+                Action::Fold(players[1].clone().unwrap()),
+                Action::Call(players[2].clone().unwrap(), 0.01, false),
+                Action::Check(players[3].clone().unwrap()),
+            ],
+            flop: vec![
+                Action::Check(players[2].clone().unwrap()),
+                Action::Check(players[3].clone().unwrap()),
+                Action::Check(players[4].clone().unwrap()),
+            ],
+            turn: vec![
+                Action::Check(players[2].clone().unwrap()),
+                Action::Check(players[3].clone().unwrap()),
+                Action::Bet(players[4].clone().unwrap(), 0.18, false),
+                Action::Fold(players[2].clone().unwrap()),
+                Action::Fold(players[3].clone().unwrap()),
+                Action::UncalledBet(players[4].clone().unwrap(), 0.18),
+            ],
+            river: vec![],
+        }
+    }
+
+    #[test]
+    fn test_insert_real_fold() {}
 }

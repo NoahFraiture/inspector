@@ -16,7 +16,7 @@ pub fn parse(filepath: &str) -> Vec<Hand> {
     hands
 }
 
-fn split_hands_content(content: &str) -> Vec<String> {
+pub fn split_hands_content(content: &str) -> Vec<String> {
     let mut current_hand = String::new();
     let mut hands = Vec::new();
     for line in content.lines() {
@@ -429,8 +429,8 @@ impl Action {
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Player {
     pub name: String,
-    position: u8,
-    bank: f64,
+    pub position: u8,
+    pub bank: f64,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -561,56 +561,6 @@ mod tests {
         assert_eq!(actual_hand, expected_hand);
     }
 
-    /*
-    PokerStars Zoom Hand #249687478472:  Hold'em No Limit (50/100) - 2024/03/29 17:03:57 CET [2024/03/29 12:03:57 ET]
-    Table 'NLHE 50/100 6 Max' 6-max Seat #1 is the button
-    Seat 1: mrdee12 (9700 in chips)
-    Seat 2: carlitosbomba (9178 in chips)
-    Seat 3: PokerZhyte (10000 in chips)
-    Seat 4: haroldfried13 (12004 in chips)
-    Seat 5: gerdi2 (45153 in chips)
-    Seat 6: ArrAppA-Hi (11063 in chips)
-    carlitosbomba: posts small blind 50
-    PokerZhyte: posts big blind 100
-    *** HOLE CARDS ***
-    Dealt to PokerZhyte [Ah As]
-    haroldfried13: folds
-    gerdi2: calls 100
-    ArrAppA-Hi: calls 100
-    mrdee12: calls 100
-    carlitosbomba: calls 50
-    PokerZhyte: raises 400 to 500
-    gerdi2: folds
-    ArrAppA-Hi: calls 400
-    mrdee12: folds
-    carlitosbomba: calls 400
-    *** FLOP *** [8c 7c Jc]
-    carlitosbomba: checks
-    PokerZhyte: bets 1003
-    ArrAppA-Hi: calls 1003
-    carlitosbomba: calls 1003
-    *** TURN *** [8c 7c Jc] [9s]
-    carlitosbomba: bets 2000
-    PokerZhyte: calls 2000
-    ArrAppA-Hi: raises 7560 to 9560 and is all-in
-    carlitosbomba: calls 5675 and is all-in
-    PokerZhyte: folds
-    Uncalled bet (1885) returned to ArrAppA-Hi
-    *** RIVER *** [8c 7c Jc 9s] [8s]
-    *** SHOW DOWN ***
-    carlitosbomba: shows [Th 5h] (a straight, Seven to Jack)
-    ArrAppA-Hi: shows [Ac 6h] (a pair of Eights)
-    carlitosbomba collected 20846 from pot
-    *** SUMMARY ***
-    Total pot 22059 | Rake 1213
-    Board [8c 7c Jc 9s 8s]
-    Seat 1: mrdee12 (button) folded before Flop
-    Seat 2: carlitosbomba (small blind) showed [Th 5h] and won (20846) with a straight, Seven to Jack
-    Seat 3: PokerZhyte (big blind) folded on the Turn
-    Seat 4: haroldfried13 folded before Flop (didn't bet)
-    Seat 5: gerdi2 folded before Flop
-    Seat 6: ArrAppA-Hi showed [Ac 6h] and lost with a pair of Eights
-        */
     #[test]
     fn test_fake_showdown() {
         let hands_content = init();
