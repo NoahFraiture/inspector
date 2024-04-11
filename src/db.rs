@@ -12,7 +12,7 @@ fn get_name(player: &Option<Player>) -> String {
 
 fn get_card(card: &Option<String>) -> String {
     if let Some(card) = &card {
-        String::from(card)
+        card.to_string()
     } else {
         String::from("null")
     }
@@ -88,14 +88,14 @@ pub struct HandDB {
 }
 
 impl HandDB {
-    pub fn new() -> Result<Self> {
-        let connection = Connection::open("data/hands.db")?;
+    pub fn new(path: &str) -> Result<Self> {
+        let connection = Connection::open(path)?;
         Result::Ok(HandDB { connection })
     }
 
     pub fn insert(&self, hand: &Hand) -> Result<()> {
         let hand_query = format!(
-            "INSERT INTO Hand VALUES ({}, {}, \"{}\", {}, \"{}\", {}, \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\", \"{}\")",
+            "INSERT INTO Hand (id, time, table_name, table_size, winner, pot, player1, player2, player3, player4, player5, player6, player7, player8, player9, card1, card2, card3, card4, card5) VALUES ({}, {}, \'{}\', {}, \'{}\', {}, \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\', \'{}\')",
             hand.id,
             hand.date.timestamp(),
             hand.table_name,
@@ -117,12 +117,17 @@ impl HandDB {
             get_card(&hand.turn_card),
             get_card(&hand.river_card),
         );
+        println!("{}", hand_query);
+        // NOTE : works
         let result = self.connection.execute(&hand_query, ());
+        // WARN: if already exist : err
         match result {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
 
+        println!("blind table insert");
+        // FIX: error here
         let small_blind_query = format!(
             "INSERT INTO Blind VALUES ({}, {}, {}, {})",
             hand.small_blind.player.name, hand.id, hand.small_blind.amount, "small",
@@ -137,12 +142,12 @@ impl HandDB {
             "INSERT INTO Blind VALUES ({}, {}, {}, {})",
             hand.big_blind.player.name, hand.id, hand.big_blind.amount, "big",
         );
-        let result = self.connection.execute(&big_blind_query, ());
-        match result {
+        match self.connection.execute(&big_blind_query, ()) {
             Ok(_) => {}
             Err(e) => return Err(e),
         }
 
+        println!("player table insert");
         // WARN: may restart player
         for i in 0..9 {
             if let Some(player) = &hand.players[i] {
@@ -172,15 +177,31 @@ impl HandDB {
 
         for (i, action) in hand.preflop.iter().enumerate() {
             let query = generate_action_query(action, "preflop", 0, hand.id);
+            match self.connection.execute(&query, ()) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
         for (i, action) in hand.flop.iter().enumerate() {
             let query = generate_action_query(action, "flop", 0, hand.id);
+            match self.connection.execute(&query, ()) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
         for (i, action) in hand.turn.iter().enumerate() {
             let query = generate_action_query(action, "turn", 0, hand.id);
+            match self.connection.execute(&query, ()) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
         for (i, action) in hand.river.iter().enumerate() {
             let query = generate_action_query(action, "river", 0, hand.id);
+            match self.connection.execute(&query, ()) {
+                Ok(_) => {}
+                Err(e) => return Err(e),
+            }
         }
 
         Ok(())
@@ -190,10 +211,11 @@ impl HandDB {
 #[cfg(test)]
 mod tests {
     use super::super::parse::*;
+    use super::HandDB;
     use chrono::{DateTime, FixedOffset, NaiveDateTime};
-    use pretty_assertions::assert_eq;
 
-    fn init_hand_real_fold() -> Hand {
+    fn init_hand_real_fold() -> (Hand, HandDB) {
+        // TODO: use sql file to init db, for now I update it by hand
         let players = [
             Some(Player {
                 name: "sidneivl".to_string(),
@@ -233,68 +255,74 @@ mod tests {
             NaiveDateTime::parse_from_str("[2024/03/26 17:02:04 ET]", "[%Y/%m/%d %H:%M:%S ET]");
         let offset = FixedOffset::east_opt(5 * 3600).unwrap();
         let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
-        Hand {
-            small_limit: 0.01,
-            big_limit: 0.02,
-            flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
-            turn_card: Some("6s".to_string()),
-            river_card: None,
-            // NOTE : since it's not used, set to empty is easier
-            content: String::new(),
-            id: 249638850870,
-            date,
-            table_name: "Ostara III".to_string(),
-            table_size: 6,
-            button_position: 2,
-            players: players.clone(),
-            small_blind: Blind {
-                player: players[2].clone().unwrap(),
-                amount: 0.01,
+        (
+            Hand {
+                small_limit: 0.01,
+                big_limit: 0.02,
+                flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
+                turn_card: Some("6s".to_string()),
+                river_card: None,
+                // NOTE : since it's not used, set to empty is easier
+                content: String::new(),
+                id: 249638850870,
+                date,
+                table_name: "Ostara III".to_string(),
+                table_size: 6,
+                button_position: 2,
+                players: players.clone(),
+                small_blind: Blind {
+                    player: players[2].clone().unwrap(),
+                    amount: 0.01,
+                },
+                big_blind: Blind {
+                    player: players[3].clone().unwrap(),
+                    amount: 0.02,
+                },
+                end: End {
+                    pot: 0.06,
+                    winner: players[4].clone().unwrap(),
+                },
+                players_card: [
+                    None,
+                    None,
+                    None,
+                    Some(["2c".to_string(), "7d".to_string()]),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                ],
+                preflop: vec![
+                    Action::Call(players[4].clone().unwrap(), 0.02, false),
+                    Action::Fold(players[5].clone().unwrap()),
+                    Action::Fold(players[0].clone().unwrap()),
+                    Action::Fold(players[1].clone().unwrap()),
+                    Action::Call(players[2].clone().unwrap(), 0.01, false),
+                    Action::Check(players[3].clone().unwrap()),
+                ],
+                flop: vec![
+                    Action::Check(players[2].clone().unwrap()),
+                    Action::Check(players[3].clone().unwrap()),
+                    Action::Check(players[4].clone().unwrap()),
+                ],
+                turn: vec![
+                    Action::Check(players[2].clone().unwrap()),
+                    Action::Check(players[3].clone().unwrap()),
+                    Action::Bet(players[4].clone().unwrap(), 0.18, false),
+                    Action::Fold(players[2].clone().unwrap()),
+                    Action::Fold(players[3].clone().unwrap()),
+                    Action::UncalledBet(players[4].clone().unwrap(), 0.18),
+                ],
+                river: vec![],
             },
-            big_blind: Blind {
-                player: players[3].clone().unwrap(),
-                amount: 0.02,
-            },
-            end: End {
-                pot: 0.06,
-                winner: players[4].clone().unwrap(),
-            },
-            players_card: [
-                None,
-                None,
-                None,
-                Some(["2c".to_string(), "7d".to_string()]),
-                None,
-                None,
-                None,
-                None,
-                None,
-            ],
-            preflop: vec![
-                Action::Call(players[4].clone().unwrap(), 0.02, false),
-                Action::Fold(players[5].clone().unwrap()),
-                Action::Fold(players[0].clone().unwrap()),
-                Action::Fold(players[1].clone().unwrap()),
-                Action::Call(players[2].clone().unwrap(), 0.01, false),
-                Action::Check(players[3].clone().unwrap()),
-            ],
-            flop: vec![
-                Action::Check(players[2].clone().unwrap()),
-                Action::Check(players[3].clone().unwrap()),
-                Action::Check(players[4].clone().unwrap()),
-            ],
-            turn: vec![
-                Action::Check(players[2].clone().unwrap()),
-                Action::Check(players[3].clone().unwrap()),
-                Action::Bet(players[4].clone().unwrap(), 0.18, false),
-                Action::Fold(players[2].clone().unwrap()),
-                Action::Fold(players[3].clone().unwrap()),
-                Action::UncalledBet(players[4].clone().unwrap(), 0.18),
-            ],
-            river: vec![],
-        }
+            HandDB::new("test/test.db").unwrap(),
+        )
     }
 
     #[test]
-    fn test_insert_real_fold() {}
+    fn test_insert_real_fold() {
+        let (hand, hand_db) = init_hand_real_fold();
+        hand_db.insert(&hand).unwrap();
+    }
 }
