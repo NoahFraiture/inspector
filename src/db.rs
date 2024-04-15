@@ -177,7 +177,6 @@ mod tests {
   use super::super::parse::*;
   use super::HandDB;
   use chrono::{DateTime, FixedOffset, NaiveDateTime};
-  use pretty_assertions::assert_eq;
 
   fn init_hand_real_fold() -> (Hand, HandDB) {
     // TODO: use sql file to init db, for now I update it by hand
@@ -283,20 +282,5 @@ mod tests {
       },
       HandDB::new("test/test.db").unwrap(),
     )
-  }
-
-  #[test]
-  fn test_insert_real_fold() {
-    let (hand, hand_db) = init_hand_real_fold();
-    hand_db.insert(&hand).unwrap();
-
-    let mut stmt = conn.prepare("SELECT id, name, data FROM person")?;
-    let person_iter = stmt.query_map([], |row| {
-      Ok(Player {
-        name: row.get(0)?,
-        position: row.get(1)?,
-        bank: row.get(2)?,
-      })
-    })?;
   }
 }
