@@ -27,6 +27,11 @@ impl eframe::App for MyApp {
         ..Default::default()
       })
       .show(ctx, |_ui| {});
-    egui::Window::new("hey").show(ctx, |_ui| {});
+    egui::Area::new(egui::Id::new("my area")).show(ctx, |_ui| {
+      _ui.label("floating text");
+      if _ui.button("Move me").clicked() {
+        println!("do thing");
+      }
+    });
   }
 }
