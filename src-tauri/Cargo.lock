@@ -87,6 +87,7 @@ dependencies = [
  "chrono",
  "mouse_position",
  "pretty_assertions",
+ "rand 0.8.5",
  "regex",
  "rusqlite",
  "serde",
