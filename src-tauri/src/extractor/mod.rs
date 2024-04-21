@@ -1,6 +1,8 @@
 #![allow(dead_code)]
-use super::parse::{Action, Hand, Player};
+use parse::{Action, Hand, Player};
 use rusqlite::{Connection, Result};
+
+pub mod parse;
 
 fn get_name(player: &Option<Player>) -> String {
   if let Some(player) = &player {
@@ -85,7 +87,7 @@ fn generate_action_query(action: &Action, moment: &str, i: usize, id: u64) -> St
   return query;
 }
 
-pub struct HandDB {
+struct HandDB {
   connection: Connection,
 }
 
@@ -174,8 +176,8 @@ impl HandDB {
 
 #[cfg(test)]
 mod tests {
-  use super::super::parse::*;
-  use super::HandDB;
+  use super::parse::{Blind, End};
+  use super::*;
   use chrono::{DateTime, FixedOffset, NaiveDateTime};
 
   fn init_hand_real_fold() -> (Hand, HandDB) {

@@ -10,6 +10,8 @@
 
 	function onMouseMove(e) {
 		if (moving) {
+			// NOTE: works only on linux, on windows and macos it's probably a delta
+			// this it should be 'left += e.movementX'
 			left = e.movementX;
 			top = e.movementY;
 		}
