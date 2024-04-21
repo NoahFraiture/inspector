@@ -10,8 +10,8 @@
 
 	function onMouseMove(e) {
 		if (moving) {
-			left += e.movementX;
-			top += e.movementY;
+			left = e.movementX;
+			top = e.movementY;
 		}
 	}
 
