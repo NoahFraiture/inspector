@@ -1,54 +1,118 @@
 use crate::parse::Action;
 use crate::Hand;
 
+#[derive(Default)]
+struct Player {
+  name: String,
+  vpip: f64,
+  pfr: f64,
+  af: f64,
+  pre_3bet: f64,
+  fold_pre_3bet: f64,
+  cbet: f64,
+  fold_cbet: f64,
+  squeeze: f64,
+
+  // number of hands used to compute stats. Usefull to easily add new hand without recomputing all hands
+  nb_hand: u32,
+  nb_can_pre_3bet: u32,
+  nb_can_fold_pre_3bet: u32,
+  nb_can_cbet: u32,
+  nb_can_fold_cbet: u32,
+  nb_can_squeeze: u32,
+}
+
+impl Player {
+  fn new(hands: Vec<Hand>, name: &str) -> Self {
+    let mut vpip_sum = 0;
+    let mut pfr_sum = 0;
+
+    // to compute af
+    let mut call_sum = 0;
+    let mut raise_sum = 0;
+    let mut bet_sum = 0;
+
+    let mut pre_3bet_sum = 0;
+    let mut fold_pre_3bet_sum = 0;
+    let mut cbet_sum = 0;
+    let mut fold_cbet_sum = 0;
+    let mut squeeze_sum = 0;
+
+    let mut nb_hand = 0;
+    let mut nb_can_pre_3bet = 0;
+    let mut nb_can_fold_pre_3bet = 0;
+    let mut nb_can_cbet = 0;
+    let mut nb_can_fold_cbet = 0;
+    let mut nb_can_squeeze = 0;
+
+    for hand in hands {
+      let participation = PlayerParticipation::new(&hand, name);
+      if participation.vpip {
+        vpip_sum += 1;
+      }
+      if participation.pfr {
+        pfr_sum += 1;
+      }
+      call_sum += participation.af[0]
+    }
+
+    Self {
+      ..Default::default()
+    }
+  }
+
+  fn add(hand: &Hand) {}
+}
+
 // All these stats can be split by position and moment
-// TODO : remove these
-#[derive(Default, Debug)]
+// TODO : add fold to squeeze
 struct PlayerParticipation {
   name: String,
-  vpip: bool,              // Volontary put in the pot. Without counting big-blind check
-  pfr: bool,               // preflop raise. Count raise (3-bet and more)
-  af: [u32; 3],            // agression factor, (bet + raise) / call
+  vpip: bool, // Volontary put in the pot. Without counting big-blind check
+  pfr: bool,  // preflop raise. Count raise (3-bet and more)
+
+  // agression factor, (bet + raise) / call
+  call: u32,
+  bet: u32,
+  raise: u32,
   can_pre_3bet: bool,      // Tells if the next value must be taken in account
   pre_3bet: bool,          // 3bet preflop. Only when possible
   can_fold_pre_3bet: bool, // Tells if the next alue must be taken in account
   fold_pre_3bet: bool,     // fold to 3bet preflop
   can_cbet: bool,          // Tells if the next value must be taken in account
   cbet: bool, // continuation bet flop. The player must have open and be the first to raise
+  can_fold_cbet: bool,
   fold_cbet: bool, // fold to cbet flop
+  can_squeeze: bool,
   squeeze: bool, // raise after preflop raise and at least a player has call
 }
 
 impl PlayerParticipation {
-  // TODO : change the way we find 'can_...', functions should return true, false, can't
   fn new(hand: &Hand, name: &str) -> Self {
-    // compute vpip
-    let _vpip = vpip_find(hand, name, Moment::Preflop);
-    let _pfr = pfr_find(hand, name);
-    let _af = af_find(hand, name);
-
     let pre_3bet = pre_3bet_find(hand, name);
-    let _can_pre_3bet = !matches!(pre_3bet, Bool::Impossible);
-    let _pre_3bet = !matches!(pre_3bet, Bool::True);
-
     let fold_pre_3bet = fold_pre_3bet_find(hand, name);
-    let _can_fold_pre_3bet = !matches!(fold_pre_3bet, Bool::Impossible);
-    let _fold_pre_3bet = matches!(fold_pre_3bet, Bool::True);
-
     let cbet = cbet_find(hand, name);
-    let _can_cbet = !matches!(cbet, Bool::Impossible);
-    let _cbet = matches!(cbet, Bool::True);
-
     let fold_cbet = fold_cbet_find(hand, name);
-    let _can_fold_cbet = !matches!(fold_cbet, Bool::Impossible);
-    let _fold_cbet = matches!(fold_cbet, Bool::True);
-
     let squeeze = squeeze_find(hand, name);
-    let _can_squeeze = !matches!(squeeze, Bool::Impossible);
-    let _squeeze = matches!(squeeze, Bool::True);
+    let (call, bet, raise) = af_find(hand, name);
 
     Self {
-      ..Default::default()
+      name: String::from(name),
+      vpip: vpip_find(hand, name, Moment::Preflop),
+      pfr: pfr_find(hand, name),
+      call,
+      bet,
+      raise,
+      can_pre_3bet: !matches!(pre_3bet, Bool::Impossible),
+      pre_3bet: matches!(pre_3bet, Bool::True),
+      can_fold_pre_3bet: !matches!(fold_pre_3bet, Bool::Impossible),
+      fold_pre_3bet: matches!(fold_pre_3bet, Bool::True),
+      can_cbet: !matches!(cbet, Bool::Impossible),
+      cbet: matches!(cbet, Bool::True),
+      can_fold_cbet: !matches!(fold_cbet, Bool::Impossible),
+      fold_cbet: matches!(fold_cbet, Bool::True),
+      can_squeeze: !matches!(squeeze, Bool::Impossible),
+      squeeze: matches!(squeeze, Bool::True),
     }
   }
 }
@@ -100,7 +164,7 @@ fn pfr_find(hand: &Hand, name: &str) -> bool {
 }
 
 // return number of action [call, bet, raise]
-fn af_find(hand: &Hand, name: &str) -> [u32; 3] {
+fn af_find(hand: &Hand, name: &str) -> (u32, u32, u32) {
   let mut call = 0;
   let mut bet = 0;
   let mut raise = 0;
@@ -131,7 +195,7 @@ fn af_find(hand: &Hand, name: &str) -> [u32; 3] {
       _ => {}
     }
   }
-  [call, bet, raise]
+  (call, bet, raise)
 }
 
 fn pre_3bet_find(hand: &Hand, name: &str) -> Bool {
