@@ -3,89 +3,6 @@ use crate::parse::{Action, Player};
 use crate::Hand;
 use rusqlite::{Connection, Result};
 
-fn get_name(player: &Option<Player>) -> String {
-  if let Some(player) = &player {
-    player.name.clone()
-  } else {
-    String::from("null")
-  }
-}
-
-fn get_card(card: &Option<String>) -> String {
-  if let Some(card) = &card {
-    card.to_string()
-  } else {
-    String::from("null")
-  }
-}
-
-fn get_card_flop(cards: &Option<[String; 3]>) -> [String; 3] {
-  if let Some(cards) = &cards {
-    [
-      String::from(&cards[0]),
-      String::from(&cards[1]),
-      String::from(&cards[2]),
-    ]
-  } else {
-    [
-      String::from("null"),
-      String::from("null"),
-      String::from("null"),
-    ]
-  }
-}
-
-fn generate_action_query(action: &Action, moment: &str, i: usize, id: u64) -> String {
-  let mut kind = String::new();
-  let mut amount1 = 0.;
-  let mut amount2 = 0.;
-  let mut is_allin = false;
-  let mut player_name = String::new();
-  match action {
-    Action::Call(player, amount, allin) => {
-      kind.push_str("call");
-      amount1 = *amount;
-      is_allin = *allin;
-      player_name.push_str(&player.name);
-    }
-    Action::Bet(player, amount, allin) => {
-      kind.push_str("bet");
-      amount1 = *amount;
-      is_allin = *allin;
-      player_name.push_str(&player.name);
-    }
-    Action::Raise(player, a1, a2, allin) => {
-      kind.push_str("raise");
-      amount1 = *a1;
-      amount2 = *a2;
-      is_allin = *allin;
-      player_name.push_str(&player.name);
-    }
-    Action::Check(player) => {
-      kind.push_str("check");
-      player_name.push_str(&player.name);
-    }
-    Action::Fold(player) => {
-      kind.push_str("fold");
-      player_name.push_str(&player.name);
-    }
-    Action::Leave(player) => {
-      kind.push_str("leave");
-      player_name.push_str(&player.name);
-    }
-    Action::UncalledBet(player, amount) => {
-      kind.push_str("uncalledbet");
-      player_name.push_str(&player.name);
-    }
-  }
-  let query = format!(
-    "INSERT INTO Action (player, hand, kind, moment, sequence, amount1, amount2, allin) VALUES ('{}', {}, '{}', '{}', {}, {}, {}, {})",
-    player_name, id, kind, moment, i, amount1, amount2, is_allin
-  );
-  println!("{}", query);
-  return query;
-}
-
 struct HandDB {
   connection: Connection,
 }
@@ -173,6 +90,88 @@ impl HandDB {
   }
 }
 
+fn get_name(player: &Option<Player>) -> String {
+  if let Some(player) = &player {
+    player.name.clone()
+  } else {
+    String::from("null")
+  }
+}
+
+fn get_card(card: &Option<String>) -> String {
+  if let Some(card) = &card {
+    card.to_string()
+  } else {
+    String::from("null")
+  }
+}
+
+fn get_card_flop(cards: &Option<[String; 3]>) -> [String; 3] {
+  if let Some(cards) = &cards {
+    [
+      String::from(&cards[0]),
+      String::from(&cards[1]),
+      String::from(&cards[2]),
+    ]
+  } else {
+    [
+      String::from("null"),
+      String::from("null"),
+      String::from("null"),
+    ]
+  }
+}
+
+fn generate_action_query(action: &Action, moment: &str, i: usize, id: u64) -> String {
+  let mut kind = String::new();
+  let mut amount1 = 0.;
+  let mut amount2 = 0.;
+  let mut is_allin = false;
+  let mut player_name = String::new();
+  match action {
+    Action::Call(player, amount, allin) => {
+      kind.push_str("call");
+      amount1 = *amount;
+      is_allin = *allin;
+      player_name.push_str(&player.name);
+    }
+    Action::Bet(player, amount, allin) => {
+      kind.push_str("bet");
+      amount1 = *amount;
+      is_allin = *allin;
+      player_name.push_str(&player.name);
+    }
+    Action::Raise(player, a1, a2, allin) => {
+      kind.push_str("raise");
+      amount1 = *a1;
+      amount2 = *a2;
+      is_allin = *allin;
+      player_name.push_str(&player.name);
+    }
+    Action::Check(player) => {
+      kind.push_str("check");
+      player_name.push_str(&player.name);
+    }
+    Action::Fold(player) => {
+      kind.push_str("fold");
+      player_name.push_str(&player.name);
+    }
+    Action::Leave(player) => {
+      kind.push_str("leave");
+      player_name.push_str(&player.name);
+    }
+    Action::UncalledBet(player, amount) => {
+      kind.push_str("uncalledbet");
+      player_name.push_str(&player.name);
+    }
+  }
+  let query = format!(
+    "INSERT INTO Action (player, hand, kind, moment, sequence, amount1, amount2, allin) VALUES ('{}', {}, '{}', '{}', {}, {}, {}, {})",
+    player_name, id, kind, moment, i, amount1, amount2, is_allin
+  );
+  println!("{}", query);
+  return query;
+}
 #[cfg(test)]
 mod tests {
   use super::*;
