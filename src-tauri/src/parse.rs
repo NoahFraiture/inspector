@@ -1,3 +1,4 @@
+use crate::Hand;
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use regex::Regex;
 use std::fs;
@@ -311,30 +312,6 @@ fn showdown(hand: &mut Hand, lines: &mut Lines) {
       hand.end = End::extract_end(hand, line)
     }
   }
-}
-
-#[derive(Default, Debug, PartialEq)]
-pub struct Hand {
-  pub content: String,
-  pub id: u64, // u32 is too small
-  pub date: DateTime<FixedOffset>,
-  pub small_limit: f64,
-  pub big_limit: f64,
-  pub table_name: String,
-  pub table_size: u8,
-  pub button_position: u8, // usefull to shift position and guess real position
-  pub players: [Option<Player>; 9],
-  pub small_blind: Blind,
-  pub big_blind: Blind,
-  pub end: End, // NOTE: not used
-  pub players_card: [Option<[String; 2]>; 9],
-  pub preflop: Vec<Action>,
-  pub flop: Vec<Action>,
-  pub turn: Vec<Action>,
-  pub river: Vec<Action>,
-  pub flop_card: Option<[String; 3]>,
-  pub turn_card: Option<String>,
-  pub river_card: Option<String>,
 }
 
 impl Hand {

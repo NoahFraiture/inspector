@@ -1,8 +1,7 @@
 #![allow(dead_code)]
-use parse::{Action, Hand, Player};
+use crate::parse::{Action, Player};
+use crate::Hand;
 use rusqlite::{Connection, Result};
-
-pub mod parse;
 
 fn get_name(player: &Option<Player>) -> String {
   if let Some(player) = &player {
@@ -176,8 +175,8 @@ impl HandDB {
 
 #[cfg(test)]
 mod tests {
-  use super::parse::{Blind, End};
   use super::*;
+  use crate::parse::{Blind, End};
   use chrono::{DateTime, FixedOffset, NaiveDateTime};
 
   fn init_hand_real_fold() -> (Hand, HandDB) {
