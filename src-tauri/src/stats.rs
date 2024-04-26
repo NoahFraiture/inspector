@@ -1,4 +1,5 @@
-use super::extractor::parse::{Action, Hand};
+use crate::parse::Action;
+use crate::Hand;
 
 // All these stats can be split by position and moment
 // TODO : remove these
