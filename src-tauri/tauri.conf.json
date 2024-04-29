@@ -59,7 +59,7 @@
         "resizable": true,
         "title": "Inspector",
         "width": 800,
-        "transparent": true
+        "transparent": false
       }
     ]
   }
