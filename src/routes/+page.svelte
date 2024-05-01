@@ -1,5 +1,5 @@
 <script>
-	import Box from '../lib/Box.svelte';
+	import Box from '$lib/Box.svelte';
 </script>
 
 <h1>Welcome to SvelteKit</h1>
