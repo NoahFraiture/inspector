@@ -421,6 +421,7 @@ pub struct Blind {
 
 #[cfg(test)]
 mod tests {
+  // TODO: modify player to match new db player
   use super::*;
   use pretty_assertions::assert_eq;
 
