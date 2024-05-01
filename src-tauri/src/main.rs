@@ -2,8 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use chrono::{DateTime, FixedOffset};
 
+mod db;
 mod parse;
-mod parse_db;
 mod stats;
 
 fn main() {
