@@ -1,8 +1,9 @@
 use notify::{RecursiveMode, Result, Watcher};
+use std::collections::HashMap;
 use std::io;
 use std::path::Path;
 
-fn main() -> Result<()> {
+fn watch() -> Result<()> {
   // Automatically select the best implementation for your platform.
   let mut watcher = notify::recommended_watcher(|res| match res {
     Ok(event) => println!("event: {:?}", event),

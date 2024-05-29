@@ -1,106 +1,68 @@
-use crate::parse::Action;
-use crate::Hand;
+use crate::parse::{Action, Hand};
+use app::models::Player;
 
-#[derive(Default)]
-pub struct Player {
-  // There's a choice to do : lot of casting, or lack of precision by staying in f64. I choose f64 since it must be
-  // faster
-  name: String,
-  vpip: f64,
-  pfr: f64,
-  af: f64,
-  pre_3bet: f64,
-  fold_pre_3bet: f64,
-  cbet: f64,
-  fold_cbet: f64,
-  squeeze: f64,
+pub fn add(player: &mut Player, hands: Vec<Hand>) {
+  let mut nb_vpip = player.vpip * player.nb_hand;
+  let mut nb_pfr = player.pfr * player.nb_hand;
 
-  // number of hands used to compute stats. Usefull to easily add new hand without recomputing all hands
-  nb_hand: f64,
-  nb_can_pre_3bet: f64,
-  nb_can_fold_pre_3bet: f64,
-  nb_can_cbet: f64,
-  nb_can_fold_cbet: f64,
-  nb_can_squeeze: f64,
-  nb_call: f64,
-  nb_bet: f64,
-  nb_raise: f64,
-}
+  let mut nb_pre_3bet = player.pre_3bet * player.nb_can_pre_3bet;
+  let mut nb_fold_pre_3bet = player.fold_pre_3bet * player.nb_can_fold_pre_3bet;
+  let mut nb_cbet = player.cbet * player.nb_can_cbet;
+  let mut nb_fold_cbet = player.fold_cbet * player.nb_can_fold_cbet;
+  let mut nb_squeeze = player.squeeze * player.nb_can_squeeze;
 
-impl Player {
-  fn new(name: &str) -> Self {
-    let mut s = Self {
-      name: String::from(name),
-      ..Default::default()
-    };
-    // update value to -1 when divided is 0
-    s.add(vec![]);
-    s
-  }
-
-  fn add(&mut self, hands: Vec<Hand>) {
-    let mut nb_vpip = self.vpip * self.nb_hand;
-    let mut nb_pfr = self.pfr * self.nb_hand;
-
-    let mut nb_pre_3bet = self.pre_3bet * self.nb_can_pre_3bet;
-    let mut nb_fold_pre_3bet = self.fold_pre_3bet * self.nb_can_fold_pre_3bet;
-    let mut nb_cbet = self.cbet * self.nb_can_cbet;
-    let mut nb_fold_cbet = self.fold_cbet * self.nb_can_fold_cbet;
-    let mut nb_squeeze = self.squeeze * self.nb_can_squeeze;
-
-    for hand in hands {
-      let participation = PlayerParticipation::new(&hand, &self.name);
-      if participation.vpip {
-        nb_vpip += 1.;
-      }
-      if participation.pfr {
-        nb_pfr += 1.;
-      }
-      self.nb_call += participation.call;
-      self.nb_bet += participation.bet;
-      self.nb_raise += participation.raise;
-
-      increase(
-        &mut self.nb_can_pre_3bet,
-        &mut nb_pre_3bet,
-        participation.can_pre_3bet,
-        participation.pre_3bet,
-      );
-      increase(
-        &mut self.nb_can_fold_pre_3bet,
-        &mut nb_fold_pre_3bet,
-        participation.can_fold_pre_3bet,
-        participation.fold_pre_3bet,
-      );
-      increase(
-        &mut self.nb_can_cbet,
-        &mut nb_cbet,
-        participation.can_cbet,
-        participation.cbet,
-      );
-      increase(
-        &mut self.nb_can_fold_cbet,
-        &mut nb_fold_cbet,
-        participation.can_fold_cbet,
-        participation.fold_cbet,
-      );
-      increase(
-        &mut self.nb_can_squeeze,
-        &mut nb_squeeze,
-        participation.can_squeeze,
-        participation.squeeze,
-      );
+  for hand in hands {
+    let participation = PlayerParticipation::new(&hand, &player.name);
+    if participation.vpip {
+      nb_vpip += 1.;
     }
+    if participation.pfr {
+      nb_pfr += 1.;
+    }
+    player.nb_call += participation.call;
+    player.nb_bet += participation.bet;
+    player.nb_raise += participation.raise;
 
-    self.vpip = divide(nb_vpip, self.nb_hand);
-    self.pfr = divide(nb_pfr, self.nb_hand);
-    self.af = divide((self.nb_bet + self.nb_raise), self.nb_call);
-    self.pre_3bet = divide(nb_pre_3bet, self.nb_can_pre_3bet);
-    self.fold_pre_3bet = divide(nb_fold_pre_3bet, self.nb_can_fold_pre_3bet);
-    self.cbet = divide(nb_cbet, self.nb_can_cbet);
-    self.fold_cbet = divide(nb_fold_cbet, self.nb_can_fold_cbet);
-    self.squeeze = divide(nb_squeeze, self.nb_can_squeeze);
+    increase(
+      &mut player.nb_can_pre_3bet,
+      &mut nb_pre_3bet,
+      participation.can_pre_3bet,
+      participation.pre_3bet,
+    );
+    increase(
+      &mut player.nb_can_fold_pre_3bet,
+      &mut nb_fold_pre_3bet,
+      participation.can_fold_pre_3bet,
+      participation.fold_pre_3bet,
+    );
+    increase(
+      &mut player.nb_can_cbet,
+      &mut nb_cbet,
+      participation.can_cbet,
+      participation.cbet,
+    );
+    increase(
+      &mut player.nb_can_fold_cbet,
+      &mut nb_fold_cbet,
+      participation.can_fold_cbet,
+      participation.fold_cbet,
+    );
+    increase(
+      &mut player.nb_can_squeeze,
+      &mut nb_squeeze,
+      participation.can_squeeze,
+      participation.squeeze,
+    );
   }
+
+  player.vpip = divide(nb_vpip, player.nb_hand);
+  player.pfr = divide(nb_pfr, player.nb_hand);
+  player.af = divide(player.nb_bet + player.nb_raise, player.nb_call);
+  player.pre_3bet = divide(nb_pre_3bet, player.nb_can_pre_3bet);
+  player.fold_pre_3bet = divide(nb_fold_pre_3bet, player.nb_can_fold_pre_3bet);
+  player.cbet = divide(nb_cbet, player.nb_can_cbet);
+  player.fold_cbet = divide(nb_fold_cbet, player.nb_can_fold_cbet);
+  player.squeeze = divide(nb_squeeze, player.nb_can_squeeze);
 }
 
 fn increase(nb_happen: &mut f64, nb_hand: &mut f64, condition: bool, happen: bool) {
