@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { graphNameStore } from '../store';
+	import { graphNameStore, graphName } from '../store';
 	import { onMount, onDestroy } from 'svelte';
 	let dropdownOpen = false;
 	let buttonElement: HTMLButtonElement;
@@ -31,7 +31,7 @@
 
 <div>
 	<button class="dropdown-btn" bind:this={buttonElement} on:click={toggleDropdown}>
-		Options ▼
+		{$graphName}▼
 	</button>
 	<div class="dropdown-content {dropdownOpen ? 'show' : ''}">
 		<a href="#" class="dropdown-link" on:click={() => selectOption('Option 1')}>Option 1</a>
