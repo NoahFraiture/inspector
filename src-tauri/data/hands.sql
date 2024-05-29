@@ -25,7 +25,25 @@ CREATE TABLE Hand(
 DROP TABLE IF EXISTS Player;
 CREATE TABLE Player(
   name TEXT PRIMARY KEY
-  -- stats
+  vpip                 FLOAT,
+  pfr                  FLOAT,
+  af                   FLOAT,
+  pre_3bet             FLOAT,
+  fold_pre_3bet        FLOAT,
+  cbet                 FLOAT,
+  fold_cbet            FLOAT,
+  squeeze              FLOAT,
+
+  -- number of hands used to compute stats. Usefull to easily add new hand without recomputing all hands
+  nb_hand              FLOAT,
+  nb_can_pre_3bet      FLOAT,
+  nb_can_fold_pre_3bet FLOAT,
+  nb_can_cbet          FLOAT,
+  nb_can_fold_cbet     FLOAT,
+  nb_can_squeeze       FLOAT,
+  nb_call              FLOAT,
+  nb_bet               FLOAT,
+  nb_raise             FLOAT,
 );
 
 DROP TABLE IF EXISTS HoleCard;

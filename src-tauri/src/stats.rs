@@ -2,7 +2,7 @@ use crate::parse::Action;
 use crate::Hand;
 
 #[derive(Default)]
-struct Player {
+pub struct Player {
   // There's a choice to do : lot of casting, or lack of precision by staying in f64. I choose f64 since it must be
   // faster
   name: String,

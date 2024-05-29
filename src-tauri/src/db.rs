@@ -3,17 +3,17 @@ use crate::parse::{Action, Player};
 use crate::Hand;
 use rusqlite::{Connection, Result};
 
-struct HandDB {
+struct DB {
   connection: Connection,
 }
 
-impl HandDB {
+impl DB {
   pub fn new(path: &str) -> Result<Self> {
     let connection = Connection::open(path)?;
-    Result::Ok(HandDB { connection })
+    Result::Ok(DB { connection })
   }
 
-  pub fn insert(&self, hand: &Hand) -> Result<(), rusqlite::Error> {
+  pub fn insert_hand(&self, hand: &Hand) -> Result<(), rusqlite::Error> {
     for i in 0..9 {
       if let Some(player) = &hand.players[i] {
         // Player table
@@ -170,15 +170,16 @@ fn generate_action_query(action: &Action, moment: &str, i: usize, id: u64) -> St
     player_name, id, kind, moment, i, amount1, amount2, is_allin
   );
   println!("{}", query);
-  return query;
+  query
 }
+
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::parse::{Blind, End};
   use chrono::{DateTime, FixedOffset, NaiveDateTime};
 
-  fn init_hand_real_fold() -> (Hand, HandDB) {
+  fn init_hand_real_fold() -> (Hand, DB) {
     // TODO: use sql file to init db, for now I update it by hand
     let players = [
       Some(Player {
@@ -280,7 +281,7 @@ mod tests {
         ],
         river: vec![],
       },
-      HandDB::new("test/test.db").unwrap(),
+      DB::new("test/test.db").unwrap(),
     )
   }
 }
