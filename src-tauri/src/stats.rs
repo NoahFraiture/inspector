@@ -1,7 +1,11 @@
-use crate::parse::{Action, Hand};
+use crate::parse::{Action, HandDetail};
 use app::models::Player;
 
-pub fn add(player: &mut Player, hands: Vec<Hand>) {
+// This use the HandDetai computed from the text
+// This means that these data can't be computed from the Hand directly from
+// the SQL database. However there's the textual content of the hand in the
+// SQL DB, which means you could recomputed HandDetail and all stats
+pub fn add(player: &mut Player, hands: Vec<HandDetail>) {
   let mut nb_vpip = player.vpip * player.nb_hand;
   let mut nb_pfr = player.pfr * player.nb_hand;
 
@@ -106,7 +110,7 @@ struct PlayerParticipation {
 }
 
 impl PlayerParticipation {
-  fn new(hand: &Hand, name: &str) -> Self {
+  fn new(hand: &HandDetail, name: &str) -> Self {
     let pre_3bet = pre_3bet_find(hand, name);
     let fold_pre_3bet = fold_pre_3bet_find(hand, name);
     let cbet = cbet_find(hand, name);
@@ -135,7 +139,7 @@ impl PlayerParticipation {
   }
 }
 
-fn vpip_find(hand: &Hand, name: &str, moment: Moment) -> bool {
+fn vpip_find(hand: &HandDetail, name: &str, moment: Moment) -> bool {
   let is_big_blind = hand.big_blind.player.name == name;
   let mut next = false;
   let actions = match moment {
@@ -170,7 +174,7 @@ fn vpip_find(hand: &Hand, name: &str, moment: Moment) -> bool {
   false
 }
 
-fn pfr_find(hand: &Hand, name: &str) -> bool {
+fn pfr_find(hand: &HandDetail, name: &str) -> bool {
   for action in &hand.preflop {
     if let Action::Raise(player, _, _, _) = action {
       if name == player.name {
@@ -182,7 +186,7 @@ fn pfr_find(hand: &Hand, name: &str) -> bool {
 }
 
 // return number of action [call, bet, raise]
-fn af_find(hand: &Hand, name: &str) -> (f64, f64, f64) {
+fn af_find(hand: &HandDetail, name: &str) -> (f64, f64, f64) {
   let mut call = 0.;
   let mut bet = 0.;
   let mut raise = 0.;
@@ -216,7 +220,7 @@ fn af_find(hand: &Hand, name: &str) -> (f64, f64, f64) {
   (call, bet, raise)
 }
 
-fn pre_3bet_find(hand: &Hand, name: &str) -> Bool {
+fn pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
   let mut raise_before = 0;
   for action in &hand.preflop {
     match action {
@@ -242,7 +246,7 @@ fn pre_3bet_find(hand: &Hand, name: &str) -> Bool {
   Bool::Impossible
 }
 
-fn fold_pre_3bet_find(hand: &Hand, name: &str) -> Bool {
+fn fold_pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
   let mut raised = false; // opponent 3 bet
   for action in &hand.preflop {
     match action {
@@ -284,7 +288,7 @@ fn fold_pre_3bet_find(hand: &Hand, name: &str) -> Bool {
   Bool::Impossible
 }
 
-fn cbet_find(hand: &Hand, name: &str) -> Bool {
+fn cbet_find(hand: &HandDetail, name: &str) -> Bool {
   let mut open = false;
   for action in &hand.preflop {
     match action {
@@ -318,7 +322,7 @@ fn cbet_find(hand: &Hand, name: &str) -> Bool {
   panic!("we should not be here")
 }
 
-fn fold_cbet_find(hand: &Hand, name: &str) -> Bool {
+fn fold_cbet_find(hand: &HandDetail, name: &str) -> Bool {
   let mut adversary: String = String::new();
   for action in &hand.preflop {
     match action {
@@ -366,7 +370,7 @@ fn fold_cbet_find(hand: &Hand, name: &str) -> Bool {
   Bool::Impossible
 }
 
-fn squeeze_find(hand: &Hand, name: &str) -> Bool {
+fn squeeze_find(hand: &HandDetail, name: &str) -> Bool {
   let mut caller = false;
   let mut open = false;
   for action in &hand.preflop {

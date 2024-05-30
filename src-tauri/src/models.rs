@@ -28,14 +28,15 @@ pub struct Blind {
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::hand)]
-// #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Hand {
   pub id: i64,
+  pub content: String,
+  pub real_money: bool,
   pub time: i64,
   pub table_name: String,
   pub table_size: i64,
   pub winner: String,
-  pub pot: i64,
+  pub pot: f64,
   pub player1: String,
   pub player2: String,
   pub player3: String,
@@ -68,6 +69,7 @@ pub struct HoldCard {
 // #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Player {
   pub name: String,
+  pub real_money: bool,
   pub vpip: f64,
   pub pfr: f64,
   pub af: f64,
@@ -88,9 +90,10 @@ pub struct Player {
 }
 
 impl Player {
-  pub fn new() -> Self {
+  pub fn new(name: &str) -> Self {
     Player {
       name: String::from(name),
+      real_money: false,
       vpip: 0.0,
       pfr: 0.0,
       af: 0.0,

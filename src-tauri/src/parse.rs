@@ -1,22 +1,23 @@
+use app::models::Hand;
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use regex::Regex;
 use std::fs;
 use std::str::Lines;
 
-pub fn parse(filepath: &str) -> Vec<Hand> {
+pub fn parse_file(filepath: &str) -> Vec<HandDetail> {
   let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
   filecontent = filecontent.replace('\r', "");
   filecontent = filecontent.replace('\u{feff}', "");
 
   let hands_content = split_hands_content(&filecontent);
-  let mut hands: Vec<Hand> = vec![];
+  let mut hands: Vec<HandDetail> = vec![];
   for hand in hands_content {
-    hands.push(parse_hand(&hand));
+    hands.push(HandDetail::parse_hand(&hand));
   }
   hands
 }
 
-pub fn split_hands_content(content: &str) -> Vec<String> {
+fn split_hands_content(content: &str) -> Vec<String> {
   let mut current_hand = String::new();
   let mut hands = Vec::new();
   for line in content.lines() {
@@ -34,34 +35,133 @@ pub fn split_hands_content(content: &str) -> Vec<String> {
   hands
 }
 
-// Suppose that the table is 6 person
-// Can use regex in future
-fn parse_hand(hand_txt: &str) -> Hand {
-  let mut hand = Hand {
-    content: hand_txt.to_string(),
-    ..Default::default()
-  };
-  let mut lines = hand_txt.lines();
-
-  start(&mut hand, &mut lines);
-  let mut next;
-  next = preflop(&mut hand, &mut lines);
-  if next {
-    next = flop(&mut hand, &mut lines);
-  }
-  if next {
-    next = turn(&mut hand, &mut lines);
-  }
-  if next {
-    next = river(&mut hand, &mut lines);
-  }
-  if next {
-    showdown(&mut hand, &mut lines);
-  }
-  hand
+// This structure will be used to compute the stats of the player
+#[derive(Default, Debug, PartialEq)]
+pub struct HandDetail {
+  pub id: i64, // u32 is too small
+  pub content: String,
+  pub real_money: bool,
+  pub date: DateTime<FixedOffset>,
+  pub small_limit: f64,
+  pub big_limit: f64,
+  pub table_name: String,
+  pub table_size: u8,
+  pub button_position: u8, // usefull to shift position and guess real position
+  pub players: [Option<Player>; 9],
+  pub small_blind: Blind,
+  pub big_blind: Blind,
+  pub end: End, // NOTE: not used
+  pub players_card: [Option<[String; 2]>; 9],
+  pub preflop: Vec<Action>,
+  pub flop: Vec<Action>,
+  pub turn: Vec<Action>,
+  pub river: Vec<Action>,
+  pub flop_card: Option<[String; 3]>,
+  pub turn_card: Option<String>,
+  pub river_card: Option<String>,
 }
 
-fn start(hand: &mut Hand, lines: &mut Lines) {
+impl HandDetail {
+  fn parse_hand(hand_txt: &str) -> Self {
+    let mut hand = HandDetail {
+      content: hand_txt.to_string(),
+      ..Default::default()
+    };
+    let mut lines = hand_txt.lines();
+
+    start(&mut hand, &mut lines);
+    let mut next;
+    next = preflop(&mut hand, &mut lines);
+    if next {
+      next = flop(&mut hand, &mut lines);
+    }
+    if next {
+      next = turn(&mut hand, &mut lines);
+    }
+    if next {
+      next = river(&mut hand, &mut lines);
+    }
+    if next {
+      showdown(&mut hand, &mut lines);
+    }
+    hand
+  }
+
+  fn to_hand(&self) -> Hand {
+    Hand {
+      id: self.id,
+      content: self.content,
+      real_money: self.real_money,
+      time: self.date.timestamp(),
+      table_name: self.table_name.clone(),
+      table_size: self.table_size as i64,
+      winner: self.end.winner.name.clone(),
+      pot: self.end.pot,
+      player1: self.players[0]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player2: self.players[1]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player3: self.players[2]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player4: self.players[3]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player5: self.players[4]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player6: self.players[5]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player7: self.players[6]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player8: self.players[7]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      player9: self.players[8]
+        .as_ref()
+        .map_or(String::new(), |p| p.name.clone()),
+      card1: self
+        .flop_card
+        .as_ref()
+        .map_or(String::new(), |cards| cards[0].clone()),
+      card2: self
+        .flop_card
+        .as_ref()
+        .map_or(String::new(), |cards| cards[1].clone()),
+      card3: self
+        .flop_card
+        .as_ref()
+        .map_or(String::new(), |cards| cards[2].clone()),
+      card4: self.turn_card.as_ref().map_or(String::new(), |c| c.clone()),
+      card5: self.turn_card.as_ref().map_or(String::new(), |c| c.clone()),
+    }
+  }
+
+  fn get_player(&self, name: &str) -> Player {
+    let trimed_name = name.trim_end_matches(':');
+    for player in &self.players {
+      match player {
+        Some(player) => {
+          if player.name == trimed_name {
+            return player.clone();
+          }
+        }
+        None => continue,
+      }
+    }
+    panic!("player not found : {:#?}", name)
+  }
+}
+
+// ========================================
+// === PARSE DIFFERENT PART OF THE FILE ===
+// ========================================
+
+fn start(hand: &mut HandDetail, lines: &mut Lines) {
   let first_line = lines.next().unwrap();
 
   // extract id
@@ -69,7 +169,7 @@ fn start(hand: &mut Hand, lines: &mut Lines) {
   let capture_id = re.captures(first_line).unwrap();
   let mut chars = capture_id[0].chars();
   chars.next();
-  hand.id = chars.as_str().parse::<u64>().unwrap();
+  hand.id = chars.as_str().parse::<i64>().unwrap();
 
   // extract date
   let re = Regex::new(r"\[(.*?)\]").unwrap();
@@ -171,7 +271,7 @@ fn start(hand: &mut Hand, lines: &mut Lines) {
   }
 }
 
-fn preflop(hand: &mut Hand, lines: &mut Lines) -> bool {
+fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
   let line = lines.next().unwrap();
   let mut split = line.split_whitespace();
   if !line.starts_with("Dealt to ") {
@@ -223,7 +323,7 @@ fn preflop(hand: &mut Hand, lines: &mut Lines) -> bool {
   false
 }
 
-fn flop(hand: &mut Hand, lines: &mut Lines) -> bool {
+fn flop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
       return false;
@@ -249,7 +349,7 @@ fn flop(hand: &mut Hand, lines: &mut Lines) -> bool {
   false
 }
 
-fn turn(hand: &mut Hand, lines: &mut Lines) -> bool {
+fn turn(hand: &mut HandDetail, lines: &mut Lines) -> bool {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
       return false;
@@ -271,7 +371,7 @@ fn turn(hand: &mut Hand, lines: &mut Lines) -> bool {
   false
 }
 
-fn river(hand: &mut Hand, lines: &mut Lines) -> bool {
+fn river(hand: &mut HandDetail, lines: &mut Lines) -> bool {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
       return false;
@@ -290,7 +390,7 @@ fn river(hand: &mut Hand, lines: &mut Lines) -> bool {
   false
 }
 
-fn showdown(hand: &mut Hand, lines: &mut Lines) {
+fn showdown(hand: &mut HandDetail, lines: &mut Lines) {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
       return;
@@ -314,54 +414,13 @@ fn showdown(hand: &mut Hand, lines: &mut Lines) {
 }
 
 #[derive(Default, Debug, PartialEq)]
-pub struct Hand {
-  pub content: String,
-  pub id: u64, // u32 is too small
-  pub date: DateTime<FixedOffset>,
-  pub small_limit: f64,
-  pub big_limit: f64,
-  pub table_name: String,
-  pub table_size: u8,
-  pub button_position: u8, // usefull to shift position and guess real position
-  pub players: [Option<Player>; 9],
-  pub small_blind: Blind,
-  pub big_blind: Blind,
-  pub end: End, // NOTE: not used
-  pub players_card: [Option<[String; 2]>; 9],
-  pub preflop: Vec<Action>,
-  pub flop: Vec<Action>,
-  pub turn: Vec<Action>,
-  pub river: Vec<Action>,
-  pub flop_card: Option<[String; 3]>,
-  pub turn_card: Option<String>,
-  pub river_card: Option<String>,
-}
-
-impl Hand {
-  fn get_player(&self, name: &str) -> Player {
-    let trimed_name = name.trim_end_matches(':');
-    for player in &self.players {
-      match player {
-        Some(player) => {
-          if player.name == trimed_name {
-            return player.clone();
-          }
-        }
-        None => continue,
-      }
-    }
-    panic!("player not found : {:#?}", name)
-  }
-}
-
-#[derive(Default, Debug, PartialEq)]
-pub struct End {
+struct End {
   pub pot: f64,
   pub winner: Player,
 }
 
 impl End {
-  fn extract_end(hand: &Hand, line: &str) -> Self {
+  fn extract_end(hand: &HandDetail, line: &str) -> Self {
     let mut split = line.split_whitespace();
     let winner = hand.get_player(split.next().unwrap());
     split.next(); // "collected"
@@ -398,7 +457,7 @@ impl Action {
       || line.contains("Uncalled bet")
   }
 
-  fn get_action(hand: &Hand, line: Vec<&str>) -> Self {
+  fn get_action(hand: &HandDetail, line: Vec<&str>) -> Self {
     match line[1] {
       "calls" => Action::Call(
         hand.get_player(&line[0].replace(':', "")),
@@ -430,14 +489,14 @@ impl Action {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-pub struct Player {
+struct Player {
   pub name: String,
   pub position: u8,
   pub bank: f64,
 }
 
 #[derive(Default, Debug, PartialEq)]
-pub struct Blind {
+struct Blind {
   pub player: Player,
   pub amount: f64,
 }
@@ -461,7 +520,7 @@ mod tests {
   #[test]
   fn test_real_fold() {
     let hands_content = init();
-    let actual_hand = parse_hand(&hands_content[0]);
+    let actual_hand = HandDetail::parse_hand(&hands_content[0]);
 
     let players = [
       Some(Player {
@@ -502,15 +561,13 @@ mod tests {
       NaiveDateTime::parse_from_str("[2024/03/26 17:02:04 ET]", "[%Y/%m/%d %H:%M:%S ET]");
     let offset = FixedOffset::east_opt(5 * 3600).unwrap();
     let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
-    let expected_hand = Hand {
+    let expected_hand = HandDetail {
+      id: 249638850870,
+      content: hands_content[0].clone(),
+      real_money: true,
+      date,
       small_limit: 0.01,
       big_limit: 0.02,
-      flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
-      turn_card: Some("6s".to_string()),
-      river_card: None,
-      content: hands_content[0].clone(),
-      id: 249638850870,
-      date,
       table_name: "Ostara III".to_string(),
       table_size: 6,
       button_position: 2,
@@ -560,6 +617,9 @@ mod tests {
         Action::UncalledBet(players[4].clone().unwrap(), 0.18),
       ],
       river: vec![],
+      flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
+      turn_card: Some("6s".to_string()),
+      river_card: None,
     };
 
     assert_eq!(actual_hand, expected_hand);
@@ -568,7 +628,7 @@ mod tests {
   #[test]
   fn test_fake_showdown() {
     let hands_content = init();
-    let actual_hand = parse_hand(&hands_content[1]);
+    let actual_hand = HandDetail::parse_hand(&hands_content[1]);
 
     let players = [
       Some(Player {
@@ -610,8 +670,9 @@ mod tests {
       NaiveDateTime::parse_from_str("[2024/03/29 12:03:57 ET]", "[%Y/%m/%d %H:%M:%S ET]");
     let offset = FixedOffset::east_opt(5 * 3600).unwrap();
     let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
-    let expected_hand = Hand {
+    let expected_hand = HandDetail {
       content: hands_content[1].clone(),
+      real_money: false,
       id: 249687478472,
       date,
       small_limit: 50.,

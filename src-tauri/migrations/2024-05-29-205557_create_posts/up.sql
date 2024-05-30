@@ -1,11 +1,13 @@
 -- Your SQL goes here
 CREATE TABLE hand(
   id INT PRIMARY KEY,
+  content TEXT NOT NULL,
+  real_money BOOLEAN NOT NULL,
   time INT NOT NULL, -- timestamp
   table_name TEXT NOT NULL,
   table_size INT NOT NULL,
   winner TEXT NOT NULL REFERENCES player(name),
-  pot INT NOT NULL,
+  pot FLOAT NOT NULL,
   player1 TEXT REFERENCES player(name), -- number are the position at the table starting at UTG
   player2 TEXT REFERENCES player(name),
   player3 TEXT REFERENCES player(name),
@@ -23,26 +25,28 @@ CREATE TABLE hand(
 );
 
 CREATE TABLE player(
-  name TEXT PRIMARY KEY,
-  vpip                 FLOAT,
-  pfr                  FLOAT,
-  af                   FLOAT,
-  pre_3bet             FLOAT,
-  fold_pre_3bet        FLOAT,
-  cbet                 FLOAT,
-  fold_cbet            FLOAT,
-  squeeze              FLOAT,
+  name TEXT,
+  real_money BOOLEAN,
+  vpip                 FLOAT NOT NULL,
+  pfr                  FLOAT NOT NULL,
+  af                   FLOAT NOT NULL,
+  pre_3bet             FLOAT NOT NULL,
+  fold_pre_3bet        FLOAT NOT NULL,
+  cbet                 FLOAT NOT NULL,
+  fold_cbet            FLOAT NOT NULL,
+  squeeze              FLOAT NOT NULL,
 
   -- number of hands used to compute stats. Usefull to easily add new hand without recomputing all hands
-  nb_hand              FLOAT,
-  nb_can_pre_3bet      FLOAT,
-  nb_can_fold_pre_3bet FLOAT,
-  nb_can_cbet          FLOAT,
-  nb_can_fold_cbet     FLOAT,
-  nb_can_squeeze       FLOAT,
-  nb_call              FLOAT,
-  nb_bet               FLOAT,
-  nb_raise             FLOAT
+  nb_hand              FLOAT NOT NULL,
+  nb_can_pre_3bet      FLOAT NOT NULL,
+  nb_can_fold_pre_3bet FLOAT NOT NULL,
+  nb_can_cbet          FLOAT NOT NULL,
+  nb_can_fold_cbet     FLOAT NOT NULL,
+  nb_can_squeeze       FLOAT NOT NULL,
+  nb_call              FLOAT NOT NULL,
+  nb_bet               FLOAT NOT NULL,
+  nb_raise             FLOAT NOT NULL,
+  PRIMARY KEY (name, real_money)
 );
 
 CREATE TABLE holeCard(

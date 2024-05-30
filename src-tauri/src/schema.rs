@@ -27,11 +27,13 @@ diesel::table! {
 diesel::table! {
     hand (id) {
         id -> Nullable<Integer>,
+        content -> Text,
+        real_money -> Bool,
         time -> Integer,
         table_name -> Text,
         table_size -> Integer,
         winner -> Text,
-        pot -> Integer,
+        pot -> Float,
         player1 -> Nullable<Text>,
         player2 -> Nullable<Text>,
         player3 -> Nullable<Text>,
@@ -50,6 +52,7 @@ diesel::table! {
 }
 
 diesel::table! {
+    #[allow(non_snake_case)]
     holeCard (id) {
         id -> Nullable<Integer>,
         hand -> Integer,
@@ -60,39 +63,31 @@ diesel::table! {
 }
 
 diesel::table! {
-    player (name) {
+    player (name, real_money) {
         name -> Nullable<Text>,
-        vpip -> Nullable<Float>,
-        pfr -> Nullable<Float>,
-        af -> Nullable<Float>,
-        pre_3bet -> Nullable<Float>,
-        fold_pre_3bet -> Nullable<Float>,
-        cbet -> Nullable<Float>,
-        fold_cbet -> Nullable<Float>,
-        squeeze -> Nullable<Float>,
-        nb_hand -> Nullable<Float>,
-        nb_can_pre_3bet -> Nullable<Float>,
-        nb_can_fold_pre_3bet -> Nullable<Float>,
-        nb_can_cbet -> Nullable<Float>,
-        nb_can_fold_cbet -> Nullable<Float>,
-        nb_can_squeeze -> Nullable<Float>,
-        nb_call -> Nullable<Float>,
-        nb_bet -> Nullable<Float>,
-        nb_raise -> Nullable<Float>,
+        real_money -> Nullable<Bool>,
+        vpip -> Float,
+        pfr -> Float,
+        af -> Float,
+        pre_3bet -> Float,
+        fold_pre_3bet -> Float,
+        cbet -> Float,
+        fold_cbet -> Float,
+        squeeze -> Float,
+        nb_hand -> Float,
+        nb_can_pre_3bet -> Float,
+        nb_can_fold_pre_3bet -> Float,
+        nb_can_cbet -> Float,
+        nb_can_fold_cbet -> Float,
+        nb_can_squeeze -> Float,
+        nb_call -> Float,
+        nb_bet -> Float,
+        nb_raise -> Float,
     }
 }
 
 diesel::joinable!(action -> hand (hand));
-diesel::joinable!(action -> player (player));
 diesel::joinable!(blind -> hand (hand));
-diesel::joinable!(blind -> player (player));
 diesel::joinable!(holeCard -> hand (hand));
-diesel::joinable!(holeCard -> player (player));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    action,
-    blind,
-    hand,
-    holeCard,
-    player,
-);
+diesel::allow_tables_to_appear_in_same_query!(action, blind, hand, holeCard, player,);
