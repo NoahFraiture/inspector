@@ -2,60 +2,59 @@
 
 diesel::table! {
     action (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         player -> Text,
-        hand -> Integer,
+        hand -> BigInt,
         kind -> Text,
         moment -> Text,
         sequence -> Integer,
-        amount1 -> Nullable<Integer>,
-        amount2 -> Nullable<Integer>,
-        allin -> Nullable<Bool>,
+        amount1 -> Float,
+        amount2 -> Float,
+        allin -> Bool,
     }
 }
 
 diesel::table! {
     blind (id) {
-        id -> Nullable<Integer>,
+        id -> Integer,
         player -> Text,
-        hand -> Integer,
-        amount -> Integer,
+        hand -> BigInt,
+        amount -> Float,
         kind -> Text,
     }
 }
 
 diesel::table! {
     hand (id) {
-        id -> Nullable<Integer>,
+        id -> BigInt,
         content -> Text,
         real_money -> Bool,
-        time -> Integer,
+        time -> BigInt,
         table_name -> Text,
         table_size -> Integer,
         winner -> Text,
         pot -> Float,
-        player1 -> Nullable<Text>,
-        player2 -> Nullable<Text>,
-        player3 -> Nullable<Text>,
-        player4 -> Nullable<Text>,
-        player5 -> Nullable<Text>,
-        player6 -> Nullable<Text>,
-        player7 -> Nullable<Text>,
-        player8 -> Nullable<Text>,
-        player9 -> Nullable<Text>,
-        card1 -> Nullable<Text>,
-        card2 -> Nullable<Text>,
-        card3 -> Nullable<Text>,
-        card4 -> Nullable<Text>,
-        card5 -> Nullable<Text>,
+        player1 -> Text,
+        player2 -> Text,
+        player3 -> Text,
+        player4 -> Text,
+        player5 -> Text,
+        player6 -> Text,
+        player7 -> Text,
+        player8 -> Text,
+        player9 -> Text,
+        card1 -> Text,
+        card2 -> Text,
+        card3 -> Text,
+        card4 -> Text,
+        card5 -> Text,
     }
 }
 
 diesel::table! {
-    #[allow(non_snake_case)]
     holeCard (id) {
-        id -> Nullable<Integer>,
-        hand -> Integer,
+        id -> Integer,
+        hand -> BigInt,
         player -> Text,
         card1 -> Text,
         card2 -> Text,
@@ -64,8 +63,8 @@ diesel::table! {
 
 diesel::table! {
     player (name, real_money) {
-        name -> Nullable<Text>,
-        real_money -> Nullable<Bool>,
+        name -> Text,
+        real_money -> Bool,
         vpip -> Float,
         pfr -> Float,
         af -> Float,
@@ -90,4 +89,10 @@ diesel::joinable!(action -> hand (hand));
 diesel::joinable!(blind -> hand (hand));
 diesel::joinable!(holeCard -> hand (hand));
 
-diesel::allow_tables_to_appear_in_same_query!(action, blind, hand, holeCard, player,);
+diesel::allow_tables_to_appear_in_same_query!(
+    action,
+    blind,
+    hand,
+    holeCard,
+    player,
+);

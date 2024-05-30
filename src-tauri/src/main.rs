@@ -13,7 +13,7 @@ fn main() {
 
   let file_path = "/home/noah/Games/poker_logs/PokerZhyte/HH20240326 Cornelia III - $0.01-$0.02 - USD No Limit Hold'em.txt";
   let hands = parse::parse_file(file_path);
-  println!("{:#?}", hands);
+  println!("number of hands : {:#?}", hands.len());
 
   let connection = &mut establish_connection();
   let results = hand
@@ -22,9 +22,9 @@ fn main() {
     .expect("Error loading posts");
 
   println!("Displaying {} posts", results.len());
-  for post in results {
-    println!("{}", post.title);
+  for h in results {
+    println!("{}", h.winner);
     println!("-----------\n");
-    println!("{}", post.body);
+    println!("{}", h.pot);
   }
 }

@@ -1,11 +1,11 @@
-use crate::parse::{Action, HandDetail};
-use app::models::Player;
+use crate::parse;
+use app::models;
 
 // This use the HandDetai computed from the text
 // This means that these data can't be computed from the Hand directly from
 // the SQL database. However there's the textual content of the hand in the
 // SQL DB, which means you could recomputed HandDetail and all stats
-pub fn add(player: &mut Player, hands: Vec<HandDetail>) {
+pub fn add(player: &mut models::Player, hands: Vec<parse::HandDetail>) {
   let mut nb_vpip = player.vpip * player.nb_hand;
   let mut nb_pfr = player.pfr * player.nb_hand;
 
@@ -69,7 +69,7 @@ pub fn add(player: &mut Player, hands: Vec<HandDetail>) {
   player.squeeze = divide(nb_squeeze, player.nb_can_squeeze);
 }
 
-fn increase(nb_happen: &mut f64, nb_hand: &mut f64, condition: bool, happen: bool) {
+fn increase(nb_happen: &mut f32, nb_hand: &mut f32, condition: bool, happen: bool) {
   if condition {
     *nb_hand += 1.;
     if happen {
@@ -78,7 +78,7 @@ fn increase(nb_happen: &mut f64, nb_hand: &mut f64, condition: bool, happen: boo
   }
 }
 
-fn divide(num: f64, den: f64) -> f64 {
+fn divide(num: f32, den: f32) -> f32 {
   if den == 0. {
     -1.
   } else {
@@ -94,9 +94,9 @@ struct PlayerParticipation {
   pfr: bool,  // preflop raise. Count raise (3-bet and more)
 
   // agression factor, (bet + raise) / call
-  call: f64,
-  bet: f64,
-  raise: f64,
+  call: f32,
+  bet: f32,
+  raise: f32,
   can_pre_3bet: bool,      // Tells if the next value must be taken in account
   pre_3bet: bool,          // 3bet preflop. Only when possible
   can_fold_pre_3bet: bool, // Tells if the next alue must be taken in account
@@ -110,7 +110,7 @@ struct PlayerParticipation {
 }
 
 impl PlayerParticipation {
-  fn new(hand: &HandDetail, name: &str) -> Self {
+  fn new(hand: &parse::HandDetail, name: &str) -> Self {
     let pre_3bet = pre_3bet_find(hand, name);
     let fold_pre_3bet = fold_pre_3bet_find(hand, name);
     let cbet = cbet_find(hand, name);
@@ -139,7 +139,7 @@ impl PlayerParticipation {
   }
 }
 
-fn vpip_find(hand: &HandDetail, name: &str, moment: Moment) -> bool {
+fn vpip_find(hand: &parse::HandDetail, name: &str, moment: Moment) -> bool {
   let is_big_blind = hand.big_blind.player.name == name;
   let mut next = false;
   let actions = match moment {
@@ -150,12 +150,14 @@ fn vpip_find(hand: &HandDetail, name: &str, moment: Moment) -> bool {
   };
   for action in actions {
     match action {
-      Action::Call(player, _, _) | Action::Bet(player, _, _) | Action::Raise(player, _, _, _) => {
+      parse::Action::Call(player, _, _)
+      | parse::Action::Bet(player, _, _)
+      | parse::Action::Raise(player, _, _, _) => {
         if name == player.name {
           return true;
         }
       }
-      Action::Check(player) => {
+      parse::Action::Check(player) => {
         if is_big_blind && name == player.name {
           next = true;
         }
@@ -174,9 +176,9 @@ fn vpip_find(hand: &HandDetail, name: &str, moment: Moment) -> bool {
   false
 }
 
-fn pfr_find(hand: &HandDetail, name: &str) -> bool {
+fn pfr_find(hand: &parse::HandDetail, name: &str) -> bool {
   for action in &hand.preflop {
-    if let Action::Raise(player, _, _, _) = action {
+    if let parse::Action::Raise(player, _, _, _) = action {
       if name == player.name {
         return true;
       }
@@ -186,7 +188,7 @@ fn pfr_find(hand: &HandDetail, name: &str) -> bool {
 }
 
 // return number of action [call, bet, raise]
-fn af_find(hand: &HandDetail, name: &str) -> (f64, f64, f64) {
+fn af_find(hand: &parse::HandDetail, name: &str) -> (f32, f32, f32) {
   let mut call = 0.;
   let mut bet = 0.;
   let mut raise = 0.;
@@ -199,17 +201,17 @@ fn af_find(hand: &HandDetail, name: &str) -> (f64, f64, f64) {
     .chain(hand.river.iter())
   {
     match action {
-      Action::Call(player, _, _) => {
+      parse::Action::Call(player, _, _) => {
         if name == player.name {
           call += 1.;
         }
       }
-      Action::Bet(player, _, _) => {
+      parse::Action::Bet(player, _, _) => {
         if name == player.name {
           bet += 1.;
         }
       }
-      Action::Raise(player, _, _, _) => {
+      parse::Action::Raise(player, _, _, _) => {
         if name == player.name {
           raise += 1.;
         }
@@ -220,11 +222,11 @@ fn af_find(hand: &HandDetail, name: &str) -> (f64, f64, f64) {
   (call, bet, raise)
 }
 
-fn pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
+fn pre_3bet_find(hand: &parse::HandDetail, name: &str) -> Bool {
   let mut raise_before = 0;
   for action in &hand.preflop {
     match action {
-      Action::Raise(player, _, _, _) => {
+      parse::Action::Raise(player, _, _, _) => {
         if name == player.name {
           if raise_before == 1 {
             return Bool::True;
@@ -235,7 +237,7 @@ fn pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
           raise_before += 1
         }
       }
-      Action::Call(player, _, _) | Action::Fold(player) => {
+      parse::Action::Call(player, _, _) | parse::Action::Fold(player) => {
         if player.name == name && raise_before == 1 {
           return Bool::False;
         }
@@ -246,18 +248,18 @@ fn pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
   Bool::Impossible
 }
 
-fn fold_pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
+fn fold_pre_3bet_find(hand: &parse::HandDetail, name: &str) -> Bool {
   let mut raised = false; // opponent 3 bet
   for action in &hand.preflop {
     match action {
-      Action::Bet(player, _, _) => {
+      parse::Action::Bet(player, _, _) => {
         if player.name != name {
           return Bool::Impossible;
         }
       }
       // At this point we know that 'name' has opened
       // If the player to play is 'name', 'raised' must be true
-      Action::Raise(player, _, _, _) => {
+      parse::Action::Raise(player, _, _, _) => {
         if name == player.name {
           return Bool::False;
         }
@@ -267,7 +269,7 @@ fn fold_pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
           return Bool::Impossible;
         }
       }
-      Action::Fold(player) => {
+      parse::Action::Fold(player) => {
         if name == player.name {
           if raised {
             return Bool::True;
@@ -276,7 +278,7 @@ fn fold_pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
           }
         }
       }
-      Action::Call(player, _, _) => {
+      parse::Action::Call(player, _, _) => {
         if player.name == name && raised {
           return Bool::False;
         }
@@ -288,12 +290,12 @@ fn fold_pre_3bet_find(hand: &HandDetail, name: &str) -> Bool {
   Bool::Impossible
 }
 
-fn cbet_find(hand: &HandDetail, name: &str) -> Bool {
+fn cbet_find(hand: &parse::HandDetail, name: &str) -> Bool {
   let mut open = false;
   for action in &hand.preflop {
     match action {
       // Raise is when player is big blind, bet on any other position
-      Action::Raise(player, _, _, _) | Action::Bet(player, _, _) => {
+      parse::Action::Raise(player, _, _, _) | parse::Action::Bet(player, _, _) => {
         open = name == player.name;
       }
       _ => {}
@@ -305,12 +307,12 @@ fn cbet_find(hand: &HandDetail, name: &str) -> Bool {
 
   for action in &hand.flop {
     match action {
-      Action::Check(player) => {
+      parse::Action::Check(player) => {
         if name == player.name {
           return Bool::False;
         }
       }
-      Action::Bet(player, _, _) => {
+      parse::Action::Bet(player, _, _) => {
         if name != player.name {
           return Bool::Impossible;
         }
@@ -322,11 +324,11 @@ fn cbet_find(hand: &HandDetail, name: &str) -> Bool {
   panic!("we should not be here")
 }
 
-fn fold_cbet_find(hand: &HandDetail, name: &str) -> Bool {
+fn fold_cbet_find(hand: &parse::HandDetail, name: &str) -> Bool {
   let mut adversary: String = String::new();
   for action in &hand.preflop {
     match action {
-      Action::Raise(player, _, _, _) | Action::Bet(player, _, _) => {
+      parse::Action::Raise(player, _, _, _) | parse::Action::Bet(player, _, _) => {
         // if someone raised preflop after open, we must update the cbetter
         adversary = String::from(&player.name);
       }
@@ -344,7 +346,7 @@ fn fold_cbet_find(hand: &HandDetail, name: &str) -> Bool {
   // NOTE: in this case we only consider the case where opener can bet and nobody has bet before
   for action in &hand.flop {
     match action {
-      Action::Bet(player, _, _) => {
+      parse::Action::Bet(player, _, _) => {
         if player.name != adversary {
           return Bool::Impossible;
         }
@@ -352,13 +354,13 @@ fn fold_cbet_find(hand: &HandDetail, name: &str) -> Bool {
 
       // if any other player raise, this doesn't count anymore
       // If we reach here, the opener has cbet already
-      Action::Raise(player, _, _, _) | Action::Call(player, _, _) => {
+      parse::Action::Raise(player, _, _, _) | parse::Action::Call(player, _, _) => {
         if player.name == name {
           return Bool::False;
         }
       }
 
-      Action::Fold(player) => {
+      parse::Action::Fold(player) => {
         if player.name == name {
           return Bool::True;
         }
@@ -370,12 +372,12 @@ fn fold_cbet_find(hand: &HandDetail, name: &str) -> Bool {
   Bool::Impossible
 }
 
-fn squeeze_find(hand: &HandDetail, name: &str) -> Bool {
+fn squeeze_find(hand: &parse::HandDetail, name: &str) -> Bool {
   let mut caller = false;
   let mut open = false;
   for action in &hand.preflop {
     match action {
-      Action::Raise(player, _, _, _) => {
+      parse::Action::Raise(player, _, _, _) => {
         if player.name != name {
           if open {
             return Bool::Impossible;
@@ -387,7 +389,7 @@ fn squeeze_find(hand: &HandDetail, name: &str) -> Bool {
           return Bool::Impossible;
         }
       }
-      Action::Call(player, _, _) => {
+      parse::Action::Call(player, _, _) => {
         if player.name == name && open {
           if caller {
             return Bool::False;
@@ -399,7 +401,7 @@ fn squeeze_find(hand: &HandDetail, name: &str) -> Bool {
           caller = true;
         }
       }
-      Action::Check(player) | Action::Fold(player) => {
+      parse::Action::Check(player) | parse::Action::Fold(player) => {
         if player.name == name && open {
           if caller {
             return Bool::False;

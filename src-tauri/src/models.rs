@@ -2,41 +2,42 @@ use diesel::prelude::*;
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::action)]
-// #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Action {
-  pub id: i64,
+  pub id: i32,
   pub player: String,
   pub hand: i64,
   pub kind: String,
   pub moment: String,
-  pub sequence: i64,
-  pub amount1: i64,
-  pub amount2: i64,
+  pub sequence: i32,
+  pub amount1: f32,
+  pub amount2: f32,
   pub allin: bool,
 }
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::blind)]
-// #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Blind {
-  pub id: i64,
+  pub id: i32,
   pub player: String,
   pub hand: i64,
-  pub amount: i64,
+  pub amount: f32,
   pub kind: String,
 }
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::hand)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Hand {
   pub id: i64,
   pub content: String,
   pub real_money: bool,
   pub time: i64,
   pub table_name: String,
-  pub table_size: i64,
+  pub table_size: i32,
   pub winner: String,
-  pub pot: f64,
+  pub pot: f32,
   pub player1: String,
   pub player2: String,
   pub player3: String,
@@ -55,9 +56,9 @@ pub struct Hand {
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::holeCard)]
-// #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct HoldCard {
-  pub id: i64,
+  pub id: i32,
   pub hand: i64,
   pub player: String,
   pub card1: String,
@@ -66,27 +67,27 @@ pub struct HoldCard {
 
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::player)]
-// #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Player {
   pub name: String,
   pub real_money: bool,
-  pub vpip: f64,
-  pub pfr: f64,
-  pub af: f64,
-  pub pre_3bet: f64,
-  pub fold_pre_3bet: f64,
-  pub cbet: f64,
-  pub fold_cbet: f64,
-  pub squeeze: f64,
-  pub nb_hand: f64,
-  pub nb_can_pre_3bet: f64,
-  pub nb_can_fold_pre_3bet: f64,
-  pub nb_can_cbet: f64,
-  pub nb_can_fold_cbet: f64,
-  pub nb_can_squeeze: f64,
-  pub nb_call: f64,
-  pub nb_bet: f64,
-  pub nb_raise: f64,
+  pub vpip: f32,
+  pub pfr: f32,
+  pub af: f32,
+  pub pre_3bet: f32,
+  pub fold_pre_3bet: f32,
+  pub cbet: f32,
+  pub fold_cbet: f32,
+  pub squeeze: f32,
+  pub nb_hand: f32,
+  pub nb_can_pre_3bet: f32,
+  pub nb_can_fold_pre_3bet: f32,
+  pub nb_can_cbet: f32,
+  pub nb_can_fold_cbet: f32,
+  pub nb_can_squeeze: f32,
+  pub nb_call: f32,
+  pub nb_bet: f32,
+  pub nb_raise: f32,
 }
 
 impl Player {

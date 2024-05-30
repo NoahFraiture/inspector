@@ -1,32 +1,32 @@
 -- Your SQL goes here
 CREATE TABLE hand(
-  id INT PRIMARY KEY,
+  id BIGINT NOT NULL PRIMARY KEY,
   content TEXT NOT NULL,
   real_money BOOLEAN NOT NULL,
-  time INT NOT NULL, -- timestamp
+  time BIGINT NOT NULL, -- timestamp
   table_name TEXT NOT NULL,
-  table_size INT NOT NULL,
+  table_size INTEGER NOT NULL,
   winner TEXT NOT NULL REFERENCES player(name),
   pot FLOAT NOT NULL,
-  player1 TEXT REFERENCES player(name), -- number are the position at the table starting at UTG
-  player2 TEXT REFERENCES player(name),
-  player3 TEXT REFERENCES player(name),
-  player4 TEXT REFERENCES player(name),
-  player5 TEXT REFERENCES player(name),
-  player6 TEXT REFERENCES player(name),
-  player7 TEXT REFERENCES player(name),
-  player8 TEXT REFERENCES player(name),
-  player9 TEXT REFERENCES player(name),
-  card1 TEXT,
-  card2 TEXT,
-  card3 TEXT,
-  card4 TEXT,
-  card5 TEXT
+  player1 TEXT NOT NULL REFERENCES player(name), -- number are the position at the table starting at UTG
+  player2 TEXT NOT NULL REFERENCES player(name),
+  player3 TEXT NOT NULL REFERENCES player(name),
+  player4 TEXT NOT NULL REFERENCES player(name),
+  player5 TEXT NOT NULL REFERENCES player(name),
+  player6 TEXT NOT NULL REFERENCES player(name),
+  player7 TEXT NOT NULL REFERENCES player(name),
+  player8 TEXT NOT NULL REFERENCES player(name),
+  player9 TEXT NOT NULL REFERENCES player(name),
+  card1 TEXT NOT NULL,
+  card2 TEXT NOT NULL,
+  card3 TEXT NOT NULL,
+  card4 TEXT NOT NULL,
+  card5 TEXT NOT NULL
 );
 
 CREATE TABLE player(
-  name TEXT,
-  real_money BOOLEAN,
+  name TEXT NOT NULL,
+  real_money BOOLEAN NOT NULL,
   vpip                 FLOAT NOT NULL,
   pfr                  FLOAT NOT NULL,
   af                   FLOAT NOT NULL,
@@ -50,32 +50,32 @@ CREATE TABLE player(
 );
 
 CREATE TABLE holeCard(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  hand INT REFERENCES hand(id) NOT NULL,
-  player TEXT REFERENCES player(name) NOT NULL,
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  hand BIGINT NOT NULL REFERENCES hand(id),
+  player TEXT NOT NULL REFERENCES player(name),
   card1 TEXT NOT NULL,
   card2 TEXT NOT NULL,
   UNIQUE(hand, player)
 );
 
 CREATE TABLE blind(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  player TEXT REFERENCES player(name) NOT NULL,
-  hand INT REFERENCES hand(id) NOT NULL,
-  amount INT NOT NULL,
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  player TEXT NOT NULL REFERENCES player(name),
+  hand BIGINT NOT NULL REFERENCES hand(id),
+  amount FLOAT NOT NULL,
   kind TEXT NOT NULL, -- big blind, small blind, ante, ...
   UNIQUE(hand, kind)
 );
 
 CREATE TABLE action(
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  player TEXT REFERENCES player(name) NOT NULL,
-  hand INT REFERENCES hand(id) NOT NULL,
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  player TEXT NOT NULL REFERENCES player(name),
+  hand BIGINT NOT NULL REFERENCES hand(id),
   kind TEXT NOT NULL, -- call, raise, fold,
   moment TEXT NOT NULL, -- pre-flop, flop, ...
-  sequence INT NOT NULL, -- first action, second action, ...
-  amount1 INT,
-  amount2 INT,
-  allin BOOLEAN,
+  sequence INTEGER NOT NULL, -- first action, second action, ...
+  amount1 FLOAT NOT NULL,
+  amount2 FLOAT NOT NULL,
+  allin BOOLEAN NOT NULL,
   UNIQUE(hand, moment, sequence)
 );

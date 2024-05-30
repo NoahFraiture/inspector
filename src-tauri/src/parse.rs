@@ -42,8 +42,8 @@ pub struct HandDetail {
   pub content: String,
   pub real_money: bool,
   pub date: DateTime<FixedOffset>,
-  pub small_limit: f64,
-  pub big_limit: f64,
+  pub small_limit: f32,
+  pub big_limit: f32,
   pub table_name: String,
   pub table_size: u8,
   pub button_position: u8, // usefull to shift position and guess real position
@@ -90,11 +90,11 @@ impl HandDetail {
   fn to_hand(&self) -> Hand {
     Hand {
       id: self.id,
-      content: self.content,
+      content: self.content.clone(),
       real_money: self.real_money,
       time: self.date.timestamp(),
       table_name: self.table_name.clone(),
-      table_size: self.table_size as i64,
+      table_size: self.table_size as i32,
       winner: self.end.winner.name.clone(),
       pot: self.end.pot,
       player1: self.players[0]
@@ -191,11 +191,11 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) {
   let small_limit_str = limits.next().unwrap();
   let big_limit_str = limits.next().unwrap();
 
-  hand.small_limit = small_limit_str.replace('$', "").parse::<f64>().unwrap();
+  hand.small_limit = small_limit_str.replace('$', "").parse::<f32>().unwrap();
   hand.big_limit = big_limit_str
     .replace('$', "")
     .replace(" USD", "")
-    .parse::<f64>()
+    .parse::<f32>()
     .unwrap();
 
   let second_line = lines.next().unwrap();
@@ -235,7 +235,7 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) {
           .last()
           .unwrap()
           .replace('$', "")
-          .parse::<f64>()
+          .parse::<f32>()
           .unwrap(),
       };
     } else if line.contains("posts big blind") {
@@ -245,7 +245,7 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) {
           .last()
           .unwrap()
           .replace('$', "")
-          .parse::<f64>()
+          .parse::<f32>()
           .unwrap(),
       };
     } else if line.starts_with("Seat ") {
@@ -262,7 +262,7 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) {
       let player = Player {
         name,
         position: position as u8,
-        bank: bank.parse::<f64>().unwrap(),
+        bank: bank.parse::<f32>().unwrap(),
       };
       hand.players[position - 1] = Some(player);
     } else if line == "*** HOLE CARDS ***" {
@@ -414,8 +414,8 @@ fn showdown(hand: &mut HandDetail, lines: &mut Lines) {
 }
 
 #[derive(Default, Debug, PartialEq)]
-struct End {
-  pub pot: f64,
+pub struct End {
+  pub pot: f32,
   pub winner: Player,
 }
 
@@ -428,7 +428,7 @@ impl End {
       .next()
       .unwrap()
       .replace('$', "")
-      .parse::<f64>()
+      .parse::<f32>()
       .unwrap();
     End { pot, winner }
   }
@@ -436,14 +436,14 @@ impl End {
 
 #[derive(Debug, PartialEq)]
 pub enum Action {
-  Call(Player, f64, bool),
+  Call(Player, f32, bool),
   /// is all-in
-  Bet(Player, f64, bool),
-  Raise(Player, f64, f64, bool), // raise from .. to ..
+  Bet(Player, f32, bool),
+  Raise(Player, f32, f32, bool), // raise from .. to ..
   Check(Player),
   Fold(Player),
   Leave(Player),
-  UncalledBet(Player, f64),
+  UncalledBet(Player, f32),
 }
 
 impl Action {
@@ -461,18 +461,18 @@ impl Action {
     match line[1] {
       "calls" => Action::Call(
         hand.get_player(&line[0].replace(':', "")),
-        line[2].replace('$', "").parse::<f64>().unwrap(),
+        line[2].replace('$', "").parse::<f32>().unwrap(),
         line.contains(&"all-in"),
       ),
       "bets" => Action::Bet(
         hand.get_player(&line[0].replace(':', "")),
-        line[2].replace('$', "").parse::<f64>().unwrap(),
+        line[2].replace('$', "").parse::<f32>().unwrap(),
         line.contains(&"all-in"),
       ),
       "raises" => Action::Raise(
         hand.get_player(&line[0].replace(':', "")),
-        line[2].replace('$', "").parse::<f64>().unwrap(),
-        line[4].replace('$', "").parse::<f64>().unwrap(),
+        line[2].replace('$', "").parse::<f32>().unwrap(),
+        line[4].replace('$', "").parse::<f32>().unwrap(),
         line.contains(&"all-in"),
       ),
       "checks" => Action::Check(hand.get_player(&line[0].replace(':', ""))),
@@ -481,7 +481,7 @@ impl Action {
       // first is Uncalled
       "bet" => Action::UncalledBet(
         hand.get_player(line.last().unwrap()),
-        line[2].replace(['$', '(', ')'], "").parse::<f64>().unwrap(),
+        line[2].replace(['$', '(', ')'], "").parse::<f32>().unwrap(),
       ),
       _ => panic!("Unknow action : {:#?}", line[1]),
     }
@@ -489,16 +489,16 @@ impl Action {
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
-struct Player {
+pub struct Player {
   pub name: String,
   pub position: u8,
-  pub bank: f64,
+  pub bank: f32,
 }
 
 #[derive(Default, Debug, PartialEq)]
-struct Blind {
+pub struct Blind {
   pub player: Player,
-  pub amount: f64,
+  pub amount: f32,
 }
 
 #[cfg(test)]
