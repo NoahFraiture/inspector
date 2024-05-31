@@ -87,7 +87,7 @@ impl HandDetail {
     hand
   }
 
-  fn to_hand(&self) -> Hand {
+  pub fn to_hand(&self) -> Hand {
     Hand {
       id: self.id,
       content: self.content.clone(),

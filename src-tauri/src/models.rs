@@ -26,7 +26,7 @@ pub struct Blind {
   pub kind: String,
 }
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = crate::schema::hand)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Hand {
