@@ -1,6 +1,7 @@
 use app::models::Hand;
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use regex::Regex;
+use std::fmt;
 use std::fs;
 use std::str::Lines;
 
@@ -157,32 +158,74 @@ impl HandDetail {
   }
 }
 
+#[derive(Debug, Clone)]
+enum ParseError {
+  Start(String),
+}
+
+impl fmt::Display for ParseError {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Error while parsing the file")
+  }
+}
+
+trait FromErr {
+  fn err_start(e: impl std::string::ToString) -> Self;
+}
+
+impl FromErr for ParseError {
+  fn err_start(e: impl std::string::ToString) -> Self {
+    ParseError::Start(format!("Error in parsing start : {}", e.to_string()))
+  }
+}
+
+trait FromNone {
+  fn none_start(s: &str) -> Self;
+}
+
+impl FromNone for ParseError {
+  fn none_start(s: &str) -> Self {
+    ParseError::Start(format!("Error in parsing start : {}", s))
+  }
+}
+
 // ========================================
 // === PARSE DIFFERENT PART OF THE FILE ===
 // ========================================
 
-fn start(hand: &mut HandDetail, lines: &mut Lines) {
-  let first_line = lines.next().unwrap();
-
-  // extract id
-  let re = Regex::new(r"#(\d+)").unwrap();
-  let capture_id = re.captures(first_line).unwrap();
+fn extract_id(line: &str) -> Result<i64, ParseError> {
+  let re = Regex::new(r"#(\d+)").map_err(ParseError::err_start)?;
+  let capture_id = re
+    .captures(line)
+    .ok_or(ParseError::none_start("Id regex failed"))?;
   let mut chars = capture_id[0].chars();
   chars.next();
-  hand.id = chars.as_str().parse::<i64>().unwrap();
+  chars.as_str().parse::<i64>().map_err(ParseError::err_start)
+}
 
-  // extract date
-  let re = Regex::new(r"\[(.*?)\]").unwrap();
-  let capture_date = re.captures(first_line).unwrap();
+fn extract_date(line: &str) -> Result<DateTime<FixedOffset>, ParseError> {
+  let re = Regex::new(r"\[(.*?)\]").map_err(ParseError::err_start)?;
+  let capture_date = re
+    .captures(line)
+    .ok_or(ParseError::none_start("Date regex failed"))?;
   let date_string = capture_date[0].to_string();
-  let date = NaiveDateTime::parse_from_str(&date_string, "[%Y/%m/%d %H:%M:%S ET]");
-  let offset = FixedOffset::east_opt(5 * 3600).unwrap();
-  hand.date = DateTime::<FixedOffset>::from_naive_utc_and_offset(date.unwrap(), offset);
 
-  // extract limits
-  // NOTE: may be useless since we create blind object later
-  let re = Regex::new(r"\(\$?(\d+\.)?\d+\/\$?(\d+\.)?\d+( USD)?\)").unwrap();
-  let capture_limites = re.captures(first_line).unwrap();
+  let date = NaiveDateTime::parse_from_str(&date_string, "[%Y/%m/%d %H:%M:%S ET]")
+    .map_err(ParseError::err_start)?;
+
+  let offset = FixedOffset::east_opt(5 * 3600).ok_or(ParseError::none_start("Offset failed"))?;
+
+  Ok(DateTime::<FixedOffset>::from_naive_utc_and_offset(
+    date, offset,
+  ))
+}
+
+fn extract_limits(line: &str) -> Result<(f32, f32), ParseError> {
+  let re =
+    Regex::new(r"\(\$?(\d+\.)?\d+\/\$?(\d+\.)?\d+( USD)?\)").map_err(ParseError::err_start)?;
+  let capture_limites = re
+    .captures(line)
+    .ok_or(ParseError::none_start("Limits regex failed"))?;
   let limits_str = capture_limites[0].to_string();
   let mut chars = limits_str.chars();
   chars.next();
@@ -190,40 +233,65 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) {
   let mut limits = chars.as_str().split('/');
   let small_limit_str = limits.next().unwrap();
   let big_limit_str = limits.next().unwrap();
+  Ok((
+    small_limit_str
+      .replace('$', "")
+      .parse::<f32>()
+      .map_err(ParseError::err_start)?,
+    big_limit_str
+      .replace('$', "")
+      .replace(" USD", "")
+      .parse::<f32>()
+      .map_err(ParseError::err_start)?,
+  ))
+}
 
-  hand.small_limit = small_limit_str.replace('$', "").parse::<f32>().unwrap();
-  hand.big_limit = big_limit_str
-    .replace('$', "")
-    .replace(" USD", "")
-    .parse::<f32>()
-    .unwrap();
-
-  let second_line = lines.next().unwrap();
-
-  // extract table name
-  let re = Regex::new(r"'([^']*)'").unwrap();
-  let capture_table_name = re.captures(second_line).unwrap();
+fn extract_table_name(line: &str) -> Result<String, ParseError> {
+  let re = Regex::new(r"'([^']*)'").map_err(ParseError::err_start)?;
+  let capture_table_name = re
+    .captures(line)
+    .ok_or(ParseError::none_start("Table name regex failed"))?;
   let mut chars = capture_table_name[0].chars();
-  chars.next(); // remove chars ''
-  chars.next_back(); // remove chars ''
-  hand.table_name = chars.as_str().to_string();
+  chars.next();
+  chars.next_back();
+  Ok(chars.as_str().to_string())
+}
 
-  // extract button position to latter shift and get actual position of the players
-  let re = Regex::new(r"#(\d+)").unwrap();
-  let capture_button_position = re.captures(second_line).unwrap();
+fn extract_button_position(line: &str) -> Result<u8, ParseError> {
+  let re = Regex::new(r"#(\d+)").map_err(ParseError::err_start)?;
+  let capture_button_position = re
+    .captures(line)
+    .ok_or(ParseError::none_start("Button position regex failed"))?;
   let mut chars = capture_button_position[0].chars();
   chars.next();
-  hand.button_position = chars.as_str().parse::<u8>().unwrap();
+  chars.as_str().parse::<u8>().map_err(ParseError::err_start)
+}
 
-  // extract table size
+fn extract_table_size(line: &str) -> Result<u8, ParseError> {
   let re = Regex::new(r"(\d+)-max").unwrap();
-  let capture_table_size = re.captures(second_line).unwrap();
+  let capture_table_size = re.captures(line).unwrap();
   let mut chars = capture_table_size[0].chars();
   chars.next_back();
   chars.next_back();
   chars.next_back();
   chars.next_back();
-  hand.table_size = chars.as_str().parse::<u8>().unwrap();
+  chars.as_str().parse::<u8>().map_err(ParseError::err_start)
+}
+
+fn start(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> {
+  let first_line = lines.next().unwrap();
+  hand.id = extract_id(first_line)?;
+  hand.date = extract_date(first_line)?;
+
+  // NOTE: may be useless since we create blind object later
+  (hand.small_limit, hand.big_limit) = extract_limits(first_line)?;
+
+  let second_line = lines.next().unwrap();
+  hand.table_name = extract_table_name(second_line)?;
+
+  // extract button position to latter shift and get actual position of the players
+  hand.button_position = extract_button_position(second_line)?;
+  hand.table_size = extract_table_size(second_line)?;
 
   // not very optimized but very easy
   for line in lines {
@@ -266,9 +334,10 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) {
       };
       hand.players[position - 1] = Some(player);
     } else if line == "*** HOLE CARDS ***" {
-      return;
+      return Ok(());
     }
   }
+  Ok(())
 }
 
 fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {

@@ -9,8 +9,19 @@ use app::*;
 use diesel::prelude::*;
 
 fn main() {
-  let file_path = "/home/noah/Games/poker_logs/PokerZhyte/HH20240326 Cornelia III - $0.01-$0.02 - USD No Limit Hold'em.txt";
-  let hands_detail = parse::parse_file(file_path);
+  let directory = "/mnt/windows/Users/noah/AppData/Local/PokerStars.BE/HandHistory/PokerZhyte/play";
+  let mut files = Vec::new();
+  for entry in std::fs::read_dir(directory).unwrap() {
+    let entry = entry.unwrap();
+    let path = entry.path();
+    let path_str = path.to_str().unwrap();
+    files.push(path_str.to_string());
+  }
+
+  println!("number of files : {:#?}", files.len());
+  println!("first file : {:#?}", files[0]);
+
+  let hands_detail = parse::parse_file(&files[0]);
   println!("number of hands : {:#?}", hands_detail.len());
 
   // map the hands to transform every element to a Hand and then insert into the db
