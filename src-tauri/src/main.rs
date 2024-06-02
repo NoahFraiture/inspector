@@ -4,6 +4,8 @@
 mod parse;
 mod stats;
 
+use core::panic;
+
 use self::models::*;
 use app::*;
 use diesel::prelude::*;
@@ -21,7 +23,10 @@ fn main() {
   println!("number of files : {:#?}", files.len());
   println!("first file : {:#?}", files[0]);
 
-  let hands_detail = parse::parse_file(&files[0]);
+  let hands_detail = match parse::parse_file(&files[0]) {
+    Err(e) => panic!("Error {:#?}\nparsing file : {:#?}", e, files[0]),
+    Ok(h) => h,
+  };
   println!("number of hands : {:#?}", hands_detail.len());
 
   // map the hands to transform every element to a Hand and then insert into the db
