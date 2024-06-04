@@ -163,17 +163,22 @@ impl HandDetail {
 #[derive(Debug, Clone)]
 pub enum ParseError {
   Start(String),
+  GetAction(String),
 }
 
 impl fmt::Display for ParseError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Error while parsing the file")
+    match self {
+      ParseError::Start(msg) => write!(f, "Start error: {}", msg),
+      ParseError::GetAction(msg) => write!(f, "GetAction error: {}", msg),
+    }
   }
 }
 
 trait FromErr {
   fn err_start(e: impl std::string::ToString) -> Self;
   fn err_start_msg(e: impl std::string::ToString, content: &str) -> Self;
+  fn err_action(e: impl std::string::ToString) -> Self;
 }
 
 impl FromErr for ParseError {
@@ -187,15 +192,22 @@ impl FromErr for ParseError {
       content
     ))
   }
+  fn err_action(e: impl std::string::ToString) -> Self {
+    ParseError::GetAction(format!("Error in getting the action : {}", e.to_string()))
+  }
 }
 
 trait FromNone {
   fn none_start(s: &str) -> Self;
+  fn none_action(s: &str) -> Self;
 }
 
 impl FromNone for ParseError {
   fn none_start(s: &str) -> Self {
     ParseError::Start(format!("Error in parsing start : {}", s))
+  }
+  fn none_action(s: &str) -> Self {
+    ParseError::GetAction(format!("Error in parsing action: {}", s))
   }
 }
 
@@ -414,10 +426,10 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
 
     if Action::is_action(line) {
       // actions
-      hand.preflop.push(Action::get_action(
-        hand,
-        line.split_whitespace().collect::<Vec<&str>>(),
-      ));
+      hand.preflop.push(
+        Action::get_action(hand, line)
+          .unwrap_or_else(|e| panic!("Error in preflop action parsing : {}", e)),
+      );
     } else if line.contains("collected") {
       hand.end = End::extract_end(hand, line)
     }
@@ -441,9 +453,10 @@ fn flop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
     }
 
     if Action::is_action(line) {
-      hand
-        .flop
-        .push(Action::get_action(hand, line.split_whitespace().collect()));
+      hand.flop.push(
+        Action::get_action(hand, line)
+          .unwrap_or_else(|e| panic!("Error in flop action parsing : {}", e)),
+      );
     } else if line.contains("collected") {
       hand.end = End::extract_end(hand, line)
     }
@@ -463,9 +476,10 @@ fn turn(hand: &mut HandDetail, lines: &mut Lines) -> bool {
       return true;
     }
     if Action::is_action(line) {
-      hand
-        .turn
-        .push(Action::get_action(hand, line.split_whitespace().collect()));
+      hand.turn.push(
+        Action::get_action(hand, line)
+          .unwrap_or_else(|e| panic!("Error in turn action parsing : {}", e)),
+      );
     } else if line.contains("collected") {
       hand.end = End::extract_end(hand, line)
     }
@@ -482,9 +496,10 @@ fn river(hand: &mut HandDetail, lines: &mut Lines) -> bool {
       return true;
     }
     if Action::is_action(line) {
-      hand
-        .river
-        .push(Action::get_action(hand, line.split_whitespace().collect()));
+      hand.river.push(
+        Action::get_action(hand, line)
+          .unwrap_or_else(|e| panic! {"Error in river action parsing : {}", e}),
+      );
     } else if line.contains("collected") {
       hand.end = End::extract_end(hand, line)
     }
@@ -559,33 +574,78 @@ impl Action {
       || line.contains("Uncalled bet")
   }
 
-  fn get_action(hand: &HandDetail, line: Vec<&str>) -> Self {
-    match line[1] {
-      "calls" => Action::Call(
-        hand.get_player(&line[0].replace(':', "")),
-        line[2].replace('$', "").parse::<f32>().unwrap(),
-        line.contains(&"all-in"),
-      ),
-      "bets" => Action::Bet(
-        hand.get_player(&line[0].replace(':', "")),
-        line[2].replace('$', "").parse::<f32>().unwrap(),
-        line.contains(&"all-in"),
-      ),
-      "raises" => Action::Raise(
-        hand.get_player(&line[0].replace(':', "")),
-        line[2].replace('$', "").parse::<f32>().unwrap(),
-        line[4].replace('$', "").parse::<f32>().unwrap(),
-        line.contains(&"all-in"),
-      ),
-      "checks" => Action::Check(hand.get_player(&line[0].replace(':', ""))),
-      "folds" => Action::Fold(hand.get_player(&line[0].replace(':', ""))),
-      "leaves" => Action::Leave(hand.get_player(&line[0].replace(':', ""))),
+  fn get_action(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
+    println!("{}", line);
+    let player_re = Regex::new(r".*:").map_err(ParseError::err_action)?;
+    let capture_position = player_re
+      .captures(line)
+      .ok_or(ParseError::none_action("player not found"))?;
+    let player = capture_position[0].replace([':'], "");
+
+    let line_after_player_re = Regex::new(r":.*").map_err(ParseError::err_action)?;
+    let capture_after = line_after_player_re
+      .captures(line)
+      .ok_or(ParseError::none_action("':' not found"))?;
+    let binding = capture_after[0].replace([':'], "");
+    let line = &binding.trim();
+
+    let action_re = Regex::new(r"\w+").map_err(ParseError::err_action)?;
+    let capture_action = action_re
+      .captures(line)
+      .ok_or(ParseError::none_action("action not found"))?;
+    let binding = capture_action[0].replace([':', '$'], "");
+    let action = binding.trim();
+
+    let amount_re = Regex::new(r"\$?(\d+\.)?\d+").map_err(ParseError::err_action)?;
+    let captures_amount = amount_re.captures_iter(line);
+    let mut amounts = captures_amount
+      .map(|a| a[0].replace(['$'], ""))
+      .map(|a| a.parse::<f32>());
+
+    match action {
+      "calls" => Ok(Action::Call(
+        hand.get_player(&player),
+        amounts
+          .next()
+          .ok_or(ParseError::none_action("Amount 1 not found"))?
+          .map_err(ParseError::err_action)?,
+        line.contains("all-in"),
+      )),
+      "bets" => Ok(Action::Bet(
+        hand.get_player(&player),
+        amounts
+          .next()
+          .ok_or(ParseError::none_action("Amount 1 not found"))?
+          .map_err(ParseError::err_action)?,
+        line.contains("all-in"),
+      )),
+      "raises" => Ok(Action::Raise(
+        hand.get_player(&player),
+        amounts
+          .next()
+          .ok_or(ParseError::none_action("Amount 1 not found"))?
+          .map_err(ParseError::err_action)?,
+        amounts
+          .next()
+          .ok_or(ParseError::none_action("Amount 2 not found"))?
+          .map_err(ParseError::err_action)?,
+        line.contains("all-in"),
+      )),
+      "checks" => Ok(Action::Check(hand.get_player(&player))),
+      "folds" => Ok(Action::Fold(hand.get_player(&player))),
+      "leaves" => Ok(Action::Leave(hand.get_player(&player))),
       // first is Uncalled
-      "bet" => Action::UncalledBet(
-        hand.get_player(line.last().unwrap()),
-        line[2].replace(['$', '(', ')'], "").parse::<f32>().unwrap(),
-      ),
-      _ => panic!("Unknow action : {:#?}", line[1]),
+      // TODO : add Uncalled action
+      "bet" => Ok(Action::UncalledBet(
+        hand.get_player(&player),
+        amounts
+          .next()
+          .ok_or(ParseError::none_action("Amount 1 not found"))?
+          .map_err(ParseError::err_action)?,
+      )),
+      _ => Err(ParseError::GetAction(
+        String::from("Unknow action : ") + action,
+      )),
     }
   }
 }
