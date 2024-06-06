@@ -576,6 +576,7 @@ impl Action {
 
   fn get_action(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
     println!("{}", line);
+    // TODO : add uncalled bet parsing
     let player_re = Regex::new(r".*:").map_err(ParseError::err_action)?;
     let capture_position = player_re
       .captures(line)
@@ -601,6 +602,7 @@ impl Action {
     let mut amounts = captures_amount
       .map(|a| a[0].replace(['$'], ""))
       .map(|a| a.parse::<f32>());
+    println!("action : {}", action);
 
     match action {
       "calls" => Ok(Action::Call(
