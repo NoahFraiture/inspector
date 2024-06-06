@@ -14,7 +14,6 @@ pub fn parse_file(filepath: &str) -> Result<Vec<HandDetail>, ParseError> {
   let mut hands: Vec<HandDetail> = vec![];
   for hand in hands_content {
     let h = HandDetail::parse_hand(&hand)?;
-    println!("{:#?}", h.id);
     hands.push(h);
   }
   Ok(hands)
@@ -74,18 +73,18 @@ impl HandDetail {
 
     start(&mut hand, &mut lines)?;
     let mut next;
-    next = preflop(&mut hand, &mut lines);
+    next = preflop(&mut hand, &mut lines)?;
     if next {
-      next = flop(&mut hand, &mut lines);
+      next = flop(&mut hand, &mut lines)?;
     }
     if next {
-      next = turn(&mut hand, &mut lines);
+      next = turn(&mut hand, &mut lines)?;
     }
     if next {
-      next = river(&mut hand, &mut lines);
+      next = river(&mut hand, &mut lines)?;
     }
     if next {
-      showdown(&mut hand, &mut lines);
+      showdown(&mut hand, &mut lines)?;
     }
     Ok(hand)
   }
@@ -144,70 +143,68 @@ impl HandDetail {
     }
   }
 
-  fn get_player(&self, name: &str) -> Player {
+  fn get_player(&self, name: &str) -> Result<Player, ParseError> {
     let trimed_name = name.trim_end_matches(':');
     for player in &self.players {
       match player {
         Some(player) => {
           if player.name == trimed_name {
-            return player.clone();
+            return Ok(player.clone());
           }
         }
         None => continue,
       }
     }
-    panic!("player not found : {:#?}", name)
+    Err(err(
+      ParseErrorType::Unknown(String::from("get player")),
+      name,
+    ))
   }
 }
 
 #[derive(Debug, Clone)]
-pub enum ParseError {
-  Start(String),
-  GetAction(String),
+pub enum ParseErrorType {
+  Start,
+  Preflop,
+  Flop,
+  Turn,
+  River,
+  Showdown,
+  Unknown(String),
 }
 
+struct ParseError {
+  t: ParseErrorType,
+  msg: String,
+}
+
+// TODO : refactor
 impl fmt::Display for ParseError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self {
-      ParseError::Start(msg) => write!(f, "Start error: {}", msg),
-      ParseError::GetAction(msg) => write!(f, "GetAction error: {}", msg),
+    match self.t {
+      ParseErrorType::Start => write!(f, "Start error: {}", self.msg),
+      ParseErrorType::Preflop => write!(f, "Preflop error: {}", self.msg),
+      ParseErrorType::Flop => write!(f, "Flop error: {}", self.msg),
+      ParseErrorType::Turn => write!(f, "Turn error: {}", self.msg),
+      ParseErrorType::River => write!(f, "River error: {}", self.msg),
+      ParseErrorType::Showdown => write!(f, "Showdown error: {}", self.msg),
+      ParseErrorType::Unknown(m) => write!(f, "Unknown {} error: {}", m, self.msg),
     }
   }
 }
 
-trait FromErr {
-  fn err_start(e: impl std::string::ToString) -> Self;
-  fn err_start_msg(e: impl std::string::ToString, content: &str) -> Self;
-  fn err_action(e: impl std::string::ToString) -> Self;
-}
-
-impl FromErr for ParseError {
-  fn err_start(e: impl std::string::ToString) -> Self {
-    ParseError::Start(format!("Error in parsing start : {}", e.to_string(),))
-  }
-  fn err_start_msg(e: impl std::string::ToString, content: &str) -> Self {
-    ParseError::Start(format!(
-      "Error in parsing start : {}. Content : {}",
-      e.to_string(),
-      content
-    ))
-  }
-  fn err_action(e: impl std::string::ToString) -> Self {
-    ParseError::GetAction(format!("Error in getting the action : {}", e.to_string()))
+fn err(t: ParseErrorType, e: impl std::string::ToString) -> ParseError {
+  ParseError {
+    msg: format!("Error : {}", e.to_string()),
+    t,
   }
 }
+fn err_msg(t: ParseErrorType, e: impl std::string::ToString, msg: &str) -> ParseError {
+  ParseError {
+    t,
 
-trait FromNone {
-  fn none_start(s: &str) -> Self;
-  fn none_action(s: &str) -> Self;
-}
-
-impl FromNone for ParseError {
-  fn none_start(s: &str) -> Self {
-    ParseError::Start(format!("Error in parsing start : {}", s))
-  }
-  fn none_action(s: &str) -> Self {
-    ParseError::GetAction(format!("Error in parsing action: {}", s))
+    // this way we get after the inner error
+    msg: format!("Message: {}\nError: {}", msg, e.to_string()),
   }
 }
 
@@ -216,29 +213,30 @@ impl FromNone for ParseError {
 // ========================================
 
 fn extract_id(line: &str) -> Result<i64, ParseError> {
-  let re = Regex::new(r"#(\d+)").map_err(ParseError::err_start)?;
+  let re = Regex::new(r"#(\d+)").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_id = re
     .captures(line)
-    .ok_or(ParseError::none_start("Id regex failed"))?;
+    .ok_or(err(ParseErrorType::Start, "Id regex failed"))?;
   let mut chars = capture_id[0].chars();
   chars.next();
   let content = chars.as_str();
   content
     .parse::<i64>()
-    .map_err(|e| ParseError::err_start_msg(e, content))
+    .map_err(|e| err_msg(ParseErrorType::Start, e, content))
 }
 
 fn extract_date(line: &str) -> Result<DateTime<FixedOffset>, ParseError> {
-  let re = Regex::new(r"\[(.*?)\]").map_err(ParseError::err_start)?;
+  let re = Regex::new(r"\[(.*?)\]").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_date = re
     .captures(line)
-    .ok_or(ParseError::none_start("Date regex failed"))?;
+    .ok_or(err(ParseErrorType::Start, "Date regex failed"))?;
   let date_string = capture_date[0].to_string();
 
   let date = NaiveDateTime::parse_from_str(&date_string, "[%Y/%m/%d %H:%M:%S ET]")
-    .map_err(ParseError::err_start)?;
+    .map_err(|e| err(ParseErrorType::Start, e))?;
 
-  let offset = FixedOffset::east_opt(5 * 3600).ok_or(ParseError::none_start("Offset failed"))?;
+  let offset =
+    FixedOffset::east_opt(5 * 3600).ok_or(err(ParseErrorType::Start, "Offset failed"))?;
 
   Ok(DateTime::<FixedOffset>::from_naive_utc_and_offset(
     date, offset,
@@ -246,11 +244,11 @@ fn extract_date(line: &str) -> Result<DateTime<FixedOffset>, ParseError> {
 }
 
 fn extract_limits(line: &str) -> Result<(f32, f32), ParseError> {
-  let re =
-    Regex::new(r"\(\$?(\d+\.)?\d+\/\$?(\d+\.)?\d+( USD)?\)").map_err(ParseError::err_start)?;
+  let re = Regex::new(r"\(\$?(\d+\.)?\d+\/\$?(\d+\.)?\d+( USD)?\)")
+    .map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_limites = re
     .captures(line)
-    .ok_or(ParseError::none_start("Limits regex failed"))?;
+    .ok_or(err(ParseErrorType::Start, "Limit not found"))?;
   let limits_str = capture_limites[0].to_string();
   let mut chars = limits_str.chars();
   chars.next();
@@ -262,20 +260,20 @@ fn extract_limits(line: &str) -> Result<(f32, f32), ParseError> {
     small_limit_str
       .replace('$', "")
       .parse::<f32>()
-      .map_err(ParseError::err_start)?,
+      .map_err(|e| err(ParseErrorType::Start, e))?,
     big_limit_str
       .replace('$', "")
       .replace(" USD", "")
       .parse::<f32>()
-      .map_err(ParseError::err_start)?,
+      .map_err(|e| err(ParseErrorType::Start, e))?,
   ))
 }
 
 fn extract_table_name(line: &str) -> Result<String, ParseError> {
-  let re = Regex::new(r"'([^']*)'").map_err(ParseError::err_start)?;
+  let re = Regex::new(r"'([^']*)'").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_table_name = re
     .captures(line)
-    .ok_or(ParseError::none_start("Table name regex failed"))?;
+    .ok_or(err(ParseErrorType::Start, "Table name regex failed"))?;
   let mut chars = capture_table_name[0].chars();
   chars.next();
   chars.next_back();
@@ -283,13 +281,16 @@ fn extract_table_name(line: &str) -> Result<String, ParseError> {
 }
 
 fn extract_button_position(line: &str) -> Result<u8, ParseError> {
-  let re = Regex::new(r"#(\d+)").map_err(ParseError::err_start)?;
+  let re = Regex::new(r"#(\d+)").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_button_position = re
     .captures(line)
-    .ok_or(ParseError::none_start("Button position regex failed"))?;
+    .ok_or(err(ParseErrorType::Start, "Button position regex failed"))?;
   let mut chars = capture_button_position[0].chars();
   chars.next();
-  chars.as_str().parse::<u8>().map_err(ParseError::err_start)
+  chars
+    .as_str()
+    .parse::<u8>()
+    .map_err(|e| err(ParseErrorType::Start, e))
 }
 
 fn extract_table_size(line: &str) -> Result<u8, ParseError> {
@@ -300,50 +301,55 @@ fn extract_table_size(line: &str) -> Result<u8, ParseError> {
   chars.next_back();
   chars.next_back();
   chars.next_back();
-  chars.as_str().parse::<u8>().map_err(ParseError::err_start)
+  chars
+    .as_str()
+    .parse::<u8>()
+    .map_err(|e| err(ParseErrorType::Start, e))
 }
 
-fn extract_blind(
-  hand: &HandDetail,
-  split: &mut std::str::SplitWhitespace,
-) -> Result<Blind, ParseError> {
-  let player_word = split
-    .next()
-    .ok_or(ParseError::none_start("Player not found"))?;
-  let player = hand.get_player(player_word);
-  let amount_word = split
-    .last()
-    .ok_or(ParseError::none_start("Amount not found"))?;
-  let amount = amount_word
-    .replace('$', "")
+fn extract_blind(hand: &HandDetail, line: &str) -> Result<Blind, ParseError> {
+  let re = Regex::new(r".*:").map_err(|e| err(ParseErrorType::Start, e))?;
+  let capture_player = re
+    .captures(line)
+    .ok_or(err(ParseErrorType::Start, "extracting blind"))?;
+  let player = hand
+    .get_player(&capture_player[0].replace([':'], ""))
+    .map_err(|e| err(ParseErrorType::Start, e))?;
+  let amount_re = Regex::new(r"\$?(\d+\.)?\d+").map_err(|e| err(ParseErrorType::Start, e))?;
+  let capture = amount_re
+    .captures(line)
+    .ok_or(err(ParseErrorType::Start, "Can't find amount in blind"))?;
+  let amount = capture[0]
+    .replace(['('], "")
     .parse::<f32>()
-    .map_err(|e| ParseError::err_start_msg(e, amount_word))?;
+    .map_err(|e| err(ParseErrorType::Start, e))?;
   Ok(Blind { player, amount })
 }
 
 fn extract_seat(line: &str) -> Result<Player, ParseError> {
-  let position_re = Regex::new(r"[0-9]").map_err(ParseError::err_start)?;
+  let position_re = Regex::new(r"[0-9]").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_position = position_re
     .captures(line)
-    .ok_or(ParseError::none_start("Position not found"))?;
+    .ok_or(err(ParseErrorType::Start, "Position not found"))?;
   let position = capture_position[0]
     .replace(':', "")
     .parse::<u8>()
-    .map_err(ParseError::err_start)?;
-  let name_re = Regex::new(r": .* \(").map_err(ParseError::err_start)?;
+    .map_err(|e| err(ParseErrorType::Start, e))?;
+  let name_re = Regex::new(r": .* \(").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_name = name_re
     .captures(line)
-    .ok_or(ParseError::none_start("Name not found"))?;
+    .ok_or(err(ParseErrorType::Start, "Name not found"))?;
   let name = String::from(capture_name[0].replace([':', '('], "").trim());
-  let bank_re = Regex::new(r"\(\$?(\d+\.)?\d+ ").map_err(ParseError::err_start)?;
+  println!("player : {}, position : {}", name, position);
+  let bank_re = Regex::new(r"\(\$?(\d+\.)?\d+ ").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_bank = bank_re
     .captures(line)
-    .ok_or(ParseError::none_start("Bank not found"))?;
+    .ok_or(err(ParseErrorType::Start, "Bank not found"))?;
   let bank = capture_bank[0]
     .replace(['$', '('], "")
     .trim()
     .parse::<f32>()
-    .map_err(|e| ParseError::err_start_msg(e, &capture_bank[0]))?;
+    .map_err(|e| err_msg(ParseErrorType::Start, e, &capture_bank[0]))?;
   Ok(Player {
     name,
     position,
@@ -370,9 +376,9 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> {
   for line in lines {
     let mut split = line.split_whitespace();
     if line.contains("posts small blind") {
-      hand.small_blind = extract_blind(hand, &mut split)?;
+      hand.small_blind = extract_blind(hand, line)?;
     } else if line.contains("posts big blind") {
-      hand.big_blind = extract_blind(hand, &mut split)?;
+      hand.big_blind = extract_blind(hand, line)?;
     } else if line.starts_with("Seat ") {
       split.next(); // "Seat"
       let player = extract_seat(line)?;
@@ -385,7 +391,7 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> {
   Ok(())
 }
 
-fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
+fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
   let line = lines.next().unwrap();
   let mut split = line.split_whitespace();
   if !line.starts_with("Dealt to ") {
@@ -394,7 +400,9 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
   split.next().unwrap();
   split.next().unwrap();
   let username = split.next().unwrap();
-  let player = hand.get_player(username);
+  let player = hand
+    .get_player(username)
+    .map_err(|e| err(ParseErrorType::Preflop, e))?;
 
   hand.players_card[player.position as usize - 1] = Some([String::new(), String::new()]);
   hand.players_card[player.position as usize - 1]
@@ -406,7 +414,7 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
 
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
-      return false;
+      return Ok(false);
     }
     if line.starts_with("*** FLOP ***") {
       let re = Regex::new(r"\[(.. .. ..)\]").unwrap();
@@ -421,7 +429,7 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
         hand_cards[i] = card.to_string();
       }
       hand.flop_card = Some(hand_cards);
-      return true;
+      return Ok(true);
     }
 
     if Action::is_action(line) {
@@ -431,16 +439,16 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
           .unwrap_or_else(|e| panic!("Error in preflop action parsing : {}", e)),
       );
     } else if line.contains("collected") {
-      hand.end = End::extract_end(hand, line)
+      hand.end = End::extract_end(hand, line)?;
     }
   }
-  false
+  Ok(false)
 }
 
-fn flop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
+fn flop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
-      return false;
+      return Ok(false);
     }
     if line.starts_with("*** TURN ***") {
       let re = Regex::new(r"\[(..)\]").unwrap();
@@ -449,7 +457,7 @@ fn flop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
       chars.next(); // remove chars [
       chars.next_back(); // remove chars ]
       hand.turn_card = Some(chars.as_str().to_string());
-      return true;
+      return Ok(true);
     }
 
     if Action::is_action(line) {
@@ -458,22 +466,22 @@ fn flop(hand: &mut HandDetail, lines: &mut Lines) -> bool {
           .unwrap_or_else(|e| panic!("Error in flop action parsing : {}", e)),
       );
     } else if line.contains("collected") {
-      hand.end = End::extract_end(hand, line)
+      hand.end = End::extract_end(hand, line)?;
     }
   }
-  false
+  Ok(false)
 }
 
-fn turn(hand: &mut HandDetail, lines: &mut Lines) -> bool {
+fn turn(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
-      return false;
+      return Ok(false);
     }
     if line.starts_with("*** RIVER ***") {
       let re = Regex::new(r"\[(..)\]").unwrap();
       let capture_card = re.captures(line).unwrap();
       hand.river_card = Some(capture_card[1].to_string().replace(['[', ']'], ""));
-      return true;
+      return Ok(true);
     }
     if Action::is_action(line) {
       hand.turn.push(
@@ -481,19 +489,19 @@ fn turn(hand: &mut HandDetail, lines: &mut Lines) -> bool {
           .unwrap_or_else(|e| panic!("Error in turn action parsing : {}", e)),
       );
     } else if line.contains("collected") {
-      hand.end = End::extract_end(hand, line)
+      hand.end = End::extract_end(hand, line)?;
     }
   }
-  false
+  Ok(false)
 }
 
-fn river(hand: &mut HandDetail, lines: &mut Lines) -> bool {
+fn river(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
-      return false;
+      return Ok(false);
     }
     if line.starts_with("*** SHOW DOWN ***") {
-      return true;
+      return Ok(true);
     }
     if Action::is_action(line) {
       hand.river.push(
@@ -501,21 +509,23 @@ fn river(hand: &mut HandDetail, lines: &mut Lines) -> bool {
           .unwrap_or_else(|e| panic! {"Error in river action parsing : {}", e}),
       );
     } else if line.contains("collected") {
-      hand.end = End::extract_end(hand, line)
+      hand.end = End::extract_end(hand, line)?;
     }
   }
-  false
+  Ok(false)
 }
 
-fn showdown(hand: &mut HandDetail, lines: &mut Lines) {
+fn showdown(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> {
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
-      return;
+      return Ok(());
     }
     if line.contains("shows") {
       let mut split = line.split_whitespace();
       let player_name = split.next().unwrap().replace(':', "");
-      let player = hand.get_player(player_name.as_str());
+      let player = hand
+        .get_player(player_name.as_str())
+        .map_err(|e| err(ParseErrorType::Showdown, e))?;
       let re = Regex::new(r"\[(.. ..)\]").unwrap();
       let capture_card = re.captures(line).unwrap();
       let cards_str = capture_card[0].replace(['[', ']'], "");
@@ -525,9 +535,10 @@ fn showdown(hand: &mut HandDetail, lines: &mut Lines) {
         cards.next().unwrap().to_string(),
       ]);
     } else if line.contains("collected") {
-      hand.end = End::extract_end(hand, line)
+      hand.end = End::extract_end(hand, line)?;
     }
   }
+  Ok(())
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -537,9 +548,9 @@ pub struct End {
 }
 
 impl End {
-  fn extract_end(hand: &HandDetail, line: &str) -> Self {
+  fn extract_end(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
     let mut split = line.split_whitespace();
-    let winner = hand.get_player(split.next().unwrap());
+    let winner = hand.get_player(split.next().unwrap())?;
     split.next(); // "collected"
     let pot = split
       .next()
@@ -547,7 +558,7 @@ impl End {
       .replace('$', "")
       .parse::<f32>()
       .unwrap();
-    End { pot, winner }
+    Ok(End { pot, winner })
   }
 }
 
@@ -574,8 +585,30 @@ impl Action {
       || line.contains("Uncalled bet")
   }
 
+  // need a special treatement
+  fn get_uncalled(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
+    let amount_re = Regex::new(r"\(\$?(\d+\.)?\d+")
+      .map_err(|e| err_msg(ParseErrorType::Unknown, e, "get uncalled"))?;
+    let capture = amount_re
+      .captures(line)
+      .ok_or(ParseError::none_action("Can't find amount in uncalled"))?;
+    let amount = capture[0]
+      .replace(['(', ')'], "")
+      .parse::<f32>()
+      .map_err(|e| err_msg(ParseErrorType::Unknown, e, "get uncalled"))?;
+    let player = line
+      .split_whitespace()
+      .skip(5)
+      .collect::<Vec<&str>>()
+      .join(" ");
+    Ok(Action::UncalledBet(hand.get_player(&player)?, amount))
+  }
+
   fn get_action(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
-    println!("{}", line);
+    if line.starts_with("Uncalled bet") {
+      return Action::get_uncalled(hand, line);
+    }
+
     // TODO : add uncalled bet parsing
     let player_re = Regex::new(r".*:").map_err(ParseError::err_action)?;
     let capture_position = player_re
@@ -602,11 +635,10 @@ impl Action {
     let mut amounts = captures_amount
       .map(|a| a[0].replace(['$'], ""))
       .map(|a| a.parse::<f32>());
-    println!("action : {}", action);
 
     match action {
       "calls" => Ok(Action::Call(
-        hand.get_player(&player),
+        hand.get_player(&player)?,
         amounts
           .next()
           .ok_or(ParseError::none_action("Amount 1 not found"))?
@@ -614,7 +646,7 @@ impl Action {
         line.contains("all-in"),
       )),
       "bets" => Ok(Action::Bet(
-        hand.get_player(&player),
+        hand.get_player(&player)?,
         amounts
           .next()
           .ok_or(ParseError::none_action("Amount 1 not found"))?
@@ -622,7 +654,7 @@ impl Action {
         line.contains("all-in"),
       )),
       "raises" => Ok(Action::Raise(
-        hand.get_player(&player),
+        hand.get_player(&player)?,
         amounts
           .next()
           .ok_or(ParseError::none_action("Amount 1 not found"))?
@@ -633,13 +665,13 @@ impl Action {
           .map_err(ParseError::err_action)?,
         line.contains("all-in"),
       )),
-      "checks" => Ok(Action::Check(hand.get_player(&player))),
-      "folds" => Ok(Action::Fold(hand.get_player(&player))),
-      "leaves" => Ok(Action::Leave(hand.get_player(&player))),
+      "checks" => Ok(Action::Check(hand.get_player(&player)?)),
+      "folds" => Ok(Action::Fold(hand.get_player(&player)?)),
+      "leaves" => Ok(Action::Leave(hand.get_player(&player)?)),
       // first is Uncalled
       // TODO : add Uncalled action
       "bet" => Ok(Action::UncalledBet(
-        hand.get_player(&player),
+        hand.get_player(&player)?,
         amounts
           .next()
           .ok_or(ParseError::none_action("Amount 1 not found"))?
