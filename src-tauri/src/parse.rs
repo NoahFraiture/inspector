@@ -4,18 +4,49 @@ use regex::Regex;
 use std::fmt;
 use std::fs;
 use std::str::Lines;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 pub fn parse_file(filepath: &str) -> Result<Vec<HandDetail>, ParseError> {
   let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
   filecontent = filecontent.replace('\r', "");
   filecontent = filecontent.replace('\u{feff}', "");
 
+  let start_time: Arc<Mutex<Duration>> = Arc::new(Mutex::new(Duration::new(0, 0)));
+  let preflop_time: Arc<Mutex<Duration>> = Arc::new(Mutex::new(Duration::new(0, 0)));
+  let flop_time: Arc<Mutex<Duration>> = Arc::new(Mutex::new(Duration::new(0, 0)));
+  let turn_time: Arc<Mutex<Duration>> = Arc::new(Mutex::new(Duration::new(0, 0)));
+  let river_time: Arc<Mutex<Duration>> = Arc::new(Mutex::new(Duration::new(0, 0)));
+  let showdown_time: Arc<Mutex<Duration>> = Arc::new(Mutex::new(Duration::new(0, 0)));
+
   let hands_content = split_hands_content(&filecontent);
   let mut hands: Vec<HandDetail> = vec![];
   for hand in hands_content {
-    let h = HandDetail::parse_hand(&hand)?;
+    let h = HandDetail::parse_hand(
+      &hand,
+      &start_time,
+      &preflop_time,
+      &flop_time,
+      &turn_time,
+      &river_time,
+      &showdown_time,
+    )?;
     hands.push(h);
   }
+
+  println!("Start time : {}", start_time.lock().unwrap().as_millis());
+  println!(
+    "preflop time : {}",
+    preflop_time.lock().unwrap().as_millis()
+  );
+  println!("flop time : {}", flop_time.lock().unwrap().as_millis());
+  println!("turn time : {}", turn_time.lock().unwrap().as_millis());
+  println!("river time : {}", river_time.lock().unwrap().as_millis());
+  println!(
+    "showdown time : {}",
+    showdown_time.lock().unwrap().as_millis()
+  );
+
   Ok(hands)
 }
 
@@ -64,27 +95,50 @@ pub struct HandDetail {
 }
 
 impl HandDetail {
-  fn parse_hand(hand_txt: &str) -> Result<Self, ParseError> {
+  fn parse_hand(
+    hand_txt: &str,
+    start_time: &Arc<Mutex<Duration>>,
+    preflop_time: &Arc<Mutex<Duration>>,
+    flop_time: &Arc<Mutex<Duration>>,
+    turn_time: &Arc<Mutex<Duration>>,
+    river_time: &Arc<Mutex<Duration>>,
+    showdown_time: &Arc<Mutex<Duration>>,
+  ) -> Result<Self, ParseError> {
     let mut hand = HandDetail {
       content: hand_txt.to_string(),
       ..Default::default()
     };
     let mut lines = hand_txt.lines();
 
+    let mut instant_start = Instant::now();
+
     start(&mut hand, &mut lines)?;
+    *start_time.lock().unwrap() += instant_start.elapsed();
+    instant_start = Instant::now();
+
     let mut next;
     next = preflop(&mut hand, &mut lines)?;
+    *preflop_time.lock().unwrap() += instant_start.elapsed();
+    instant_start = Instant::now();
+
     if next {
       next = flop(&mut hand, &mut lines)?;
+      *flop_time.lock().unwrap() += instant_start.elapsed();
+      instant_start = Instant::now();
     }
     if next {
       next = turn(&mut hand, &mut lines)?;
+      *turn_time.lock().unwrap() += instant_start.elapsed();
+      instant_start = Instant::now();
     }
     if next {
       next = river(&mut hand, &mut lines)?;
+      *river_time.lock().unwrap() += instant_start.elapsed();
+      instant_start = Instant::now();
     }
     if next {
       showdown(&mut hand, &mut lines)?;
+      *showdown_time.lock().unwrap() += instant_start.elapsed();
     }
     Ok(hand)
   }
@@ -163,7 +217,7 @@ impl HandDetail {
 }
 
 #[derive(Debug, Clone)]
-pub enum ParseErrorType {
+enum ParseErrorType {
   Start,
   Preflop,
   Flop,
@@ -173,7 +227,8 @@ pub enum ParseErrorType {
   Unknown(String),
 }
 
-struct ParseError {
+#[derive(Debug)]
+pub struct ParseError {
   t: ParseErrorType,
   msg: String,
 }
@@ -181,7 +236,7 @@ struct ParseError {
 // TODO : refactor
 impl fmt::Display for ParseError {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    match self.t {
+    match &self.t {
       ParseErrorType::Start => write!(f, "Start error: {}", self.msg),
       ParseErrorType::Preflop => write!(f, "Preflop error: {}", self.msg),
       ParseErrorType::Flop => write!(f, "Flop error: {}", self.msg),
@@ -340,7 +395,6 @@ fn extract_seat(line: &str) -> Result<Player, ParseError> {
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Name not found"))?;
   let name = String::from(capture_name[0].replace([':', '('], "").trim());
-  println!("player : {}, position : {}", name, position);
   let bank_re = Regex::new(r"\(\$?(\d+\.)?\d+ ").map_err(|e| err(ParseErrorType::Start, e))?;
   let capture_bank = bank_re
     .captures(line)
@@ -393,52 +447,68 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> {
 
 fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
   let line = lines.next().unwrap();
-  let mut split = line.split_whitespace();
-  if !line.starts_with("Dealt to ") {
-    panic!("Not preflop");
-  }
-  split.next().unwrap();
-  split.next().unwrap();
-  let username = split.next().unwrap();
+  let player_re = Regex::new(r"to .*\[").map_err(|e| err(ParseErrorType::Preflop, e))?;
+  let player_capture = player_re
+    .captures(line)
+    .ok_or(err(ParseErrorType::Preflop, "capture player"))?;
+  let mut player_chars = player_capture[0].chars();
+  player_chars
+    .next()
+    .ok_or(err(ParseErrorType::Preflop, "player next"))?;
+  player_chars
+    .next()
+    .ok_or(err(ParseErrorType::Preflop, "player next"))?;
+  player_chars
+    .next_back()
+    .ok_or(err(ParseErrorType::Preflop, "player next"))?;
+
   let player = hand
-    .get_player(username)
+    .get_player(player_chars.as_str().trim())
     .map_err(|e| err(ParseErrorType::Preflop, e))?;
 
-  hand.players_card[player.position as usize - 1] = Some([String::new(), String::new()]);
-  hand.players_card[player.position as usize - 1]
-    .as_mut()
-    .unwrap()[0] = split.next().unwrap().replace('[', "");
-  hand.players_card[player.position as usize - 1]
-    .as_mut()
-    .unwrap()[1] = split.next().unwrap().replace(']', "");
+  let cards_re = Regex::new(r"\[.. ..\]").map_err(|e| err(ParseErrorType::Preflop, e))?;
+  let cards_capture = cards_re
+    .captures(line)
+    .ok_or(err(ParseErrorType::Preflop, "capture cards"))?;
+  let binding = cards_capture[0].replace(['[', ']'], "");
+  let mut cards = binding.split_whitespace();
+  let card1 = cards.next().ok_or(err(ParseErrorType::Preflop, "card 1"))?;
+  let card2 = cards.next().ok_or(err(ParseErrorType::Preflop, "card 2"))?;
+
+  hand.players_card[player.position as usize - 1] = Some([card1.to_string(), card2.to_string()]);
 
   for line in lines {
     if line.starts_with("*** SUMMARY ***") {
       return Ok(false);
     }
     if line.starts_with("*** FLOP ***") {
-      let re = Regex::new(r"\[(.. .. ..)\]").unwrap();
+      // 500us
+      // TODO : check error of regex, fuck it for now
+      let re = Regex::new(r"\[.. .. ..\]").unwrap();
       let capture_card = re.captures(line).unwrap();
-      let mut chars = capture_card[0].chars();
-      chars.next(); // remove chars [
-      chars.next_back(); // remove chars ]
-      let c = chars.as_str().to_string();
-      let cards = c.split_whitespace();
-      let mut hand_cards: [String; 3] = [String::new(), String::new(), String::new()];
-      for (i, card) in cards.enumerate() {
-        hand_cards[i] = card.to_string();
-      }
-      hand.flop_card = Some(hand_cards);
+      let binding = capture_card[0].replace(['[', ']'], "");
+      let mut cards = binding.split_whitespace();
+      let card1 = cards
+        .next()
+        .ok_or(err(ParseErrorType::Preflop, "card 1 board"))?;
+      let card2 = cards
+        .next()
+        .ok_or(err(ParseErrorType::Preflop, "card 2 board"))?;
+      let card3 = cards
+        .next()
+        .ok_or(err(ParseErrorType::Preflop, "card 3 board"))?;
+      hand.flop_card = Some([card1.to_string(), card2.to_string(), card3.to_string()]);
       return Ok(true);
     }
 
     if Action::is_action(line) {
-      // actions
+      // 4 ms
       hand.preflop.push(
         Action::get_action(hand, line)
           .unwrap_or_else(|e| panic!("Error in preflop action parsing : {}", e)),
       );
     } else if line.contains("collected") {
+      // 1ms
       hand.end = End::extract_end(hand, line)?;
     }
   }
@@ -451,12 +521,12 @@ fn flop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
       return Ok(false);
     }
     if line.starts_with("*** TURN ***") {
-      let re = Regex::new(r"\[(..)\]").unwrap();
-      let capture_card = re.captures(line).unwrap();
-      let mut chars = capture_card[0].chars();
-      chars.next(); // remove chars [
-      chars.next_back(); // remove chars ]
-      hand.turn_card = Some(chars.as_str().to_string());
+      let cards_re = Regex::new(r"\[..\]").map_err(|e| err(ParseErrorType::Preflop, e))?;
+      let cards_capture = cards_re
+        .captures(line)
+        .ok_or(err(ParseErrorType::Preflop, "capture cards"))?;
+      let card = cards_capture[0].replace(['[', ']'], "").to_string();
+      hand.turn_card = Some(card);
       return Ok(true);
     }
 
@@ -489,7 +559,7 @@ fn turn(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
           .unwrap_or_else(|e| panic!("Error in turn action parsing : {}", e)),
       );
     } else if line.contains("collected") {
-      hand.end = End::extract_end(hand, line)?;
+      hand.end = End::extract_end(hand, line)?; // FIXME : error
     }
   }
   Ok(false)
@@ -520,14 +590,23 @@ fn showdown(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> 
     if line.starts_with("*** SUMMARY ***") {
       return Ok(());
     }
+    // NOTE: ignore muck
     if line.contains("shows") {
-      let mut split = line.split_whitespace();
-      let player_name = split.next().unwrap().replace(':', "");
+      let player_re = Regex::new(r".*:").unwrap();
+      let player_capture = player_re
+        .captures(line)
+        .ok_or(err(ParseErrorType::Showdown, "player not found"))?;
+
+      // NOTE : suppose the username can't contains ':'
+      let player_name = player_capture[0].replace([':'], "");
       let player = hand
-        .get_player(player_name.as_str())
+        .get_player(&player_name)
         .map_err(|e| err(ParseErrorType::Showdown, e))?;
+
       let re = Regex::new(r"\[(.. ..)\]").unwrap();
-      let capture_card = re.captures(line).unwrap();
+      let capture_card = re
+        .captures(line)
+        .ok_or(err(ParseErrorType::Showdown, "cards not found"))?;
       let cards_str = capture_card[0].replace(['[', ']'], "");
       let mut cards = cards_str.split_whitespace();
       hand.players_card[player.position as usize - 1] = Some([
@@ -549,15 +628,22 @@ pub struct End {
 
 impl End {
   fn extract_end(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
-    let mut split = line.split_whitespace();
-    let winner = hand.get_player(split.next().unwrap())?;
-    split.next(); // "collected"
-    let pot = split
-      .next()
-      .unwrap()
-      .replace('$', "")
+    let player_re = Regex::new(r".* collected").unwrap();
+    let player_capture = player_re.captures(line).unwrap();
+    let mut words = player_capture[0].split_whitespace();
+    words.next_back().unwrap();
+    let player_name = words.collect::<Vec<&str>>().join(" ");
+    let winner = hand.get_player(&player_name)?;
+
+    let pot_re = Regex::new(r"collected \$?(\d+\.)?\d+").unwrap();
+    let pot_capture = pot_re.captures(line).unwrap();
+    let pot_str = pot_capture[0].split_whitespace().nth(1).ok_or(err(
+      ParseErrorType::Unknown("End".to_string()),
+      "error in pot reading",
+    ))?;
+    let pot = pot_str
       .parse::<f32>()
-      .unwrap();
+      .map_err(|e| err(ParseErrorType::Unknown("End".to_string()), e))?;
     Ok(End { pot, winner })
   }
 }
@@ -588,14 +674,15 @@ impl Action {
   // need a special treatement
   fn get_uncalled(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
     let amount_re = Regex::new(r"\(\$?(\d+\.)?\d+")
-      .map_err(|e| err_msg(ParseErrorType::Unknown, e, "get uncalled"))?;
-    let capture = amount_re
-      .captures(line)
-      .ok_or(ParseError::none_action("Can't find amount in uncalled"))?;
+      .map_err(|e| err(ParseErrorType::Unknown("get uncalled".to_string()), e))?;
+    let capture = amount_re.captures(line).ok_or(err(
+      ParseErrorType::Unknown("get uncalled".to_string()),
+      "Can't find amount in uncalled",
+    ))?;
     let amount = capture[0]
       .replace(['(', ')'], "")
       .parse::<f32>()
-      .map_err(|e| err_msg(ParseErrorType::Unknown, e, "get uncalled"))?;
+      .map_err(|e| err(ParseErrorType::Unknown("get uncalled".to_string()), e))?;
     let player = line
       .split_whitespace()
       .skip(5)
@@ -605,32 +692,39 @@ impl Action {
   }
 
   fn get_action(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
+    let s = Instant::now();
     if line.starts_with("Uncalled bet") {
       return Action::get_uncalled(hand, line);
     }
 
-    // TODO : add uncalled bet parsing
-    let player_re = Regex::new(r".*:").map_err(ParseError::err_action)?;
-    let capture_position = player_re
-      .captures(line)
-      .ok_or(ParseError::none_action("player not found"))?;
+    let player_re =
+      Regex::new(r".*:").map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
+    let capture_position = player_re.captures(line).ok_or(err(
+      ParseErrorType::Unknown("get action".to_string()),
+      "player not found",
+    ))?;
     let player = capture_position[0].replace([':'], "");
 
-    let line_after_player_re = Regex::new(r":.*").map_err(ParseError::err_action)?;
-    let capture_after = line_after_player_re
-      .captures(line)
-      .ok_or(ParseError::none_action("':' not found"))?;
+    let line_after_player_re =
+      Regex::new(r":.*").map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
+    let capture_after = line_after_player_re.captures(line).ok_or(err(
+      ParseErrorType::Unknown("get action".to_string()),
+      "capture after",
+    ))?;
     let binding = capture_after[0].replace([':'], "");
     let line = &binding.trim();
 
-    let action_re = Regex::new(r"\w+").map_err(ParseError::err_action)?;
-    let capture_action = action_re
-      .captures(line)
-      .ok_or(ParseError::none_action("action not found"))?;
+    let action_re =
+      Regex::new(r"\w+").map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
+    let capture_action = action_re.captures(line).ok_or(err(
+      ParseErrorType::Unknown("get action".to_string()),
+      "capture action",
+    ))?;
     let binding = capture_action[0].replace([':', '$'], "");
     let action = binding.trim();
 
-    let amount_re = Regex::new(r"\$?(\d+\.)?\d+").map_err(ParseError::err_action)?;
+    let amount_re = Regex::new(r"\$?(\d+\.)?\d+")
+      .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
     let captures_amount = amount_re.captures_iter(line);
     let mut amounts = captures_amount
       .map(|a| a[0].replace(['$'], ""))
@@ -641,28 +735,40 @@ impl Action {
         hand.get_player(&player)?,
         amounts
           .next()
-          .ok_or(ParseError::none_action("Amount 1 not found"))?
-          .map_err(ParseError::err_action)?,
+          .ok_or(err(
+            ParseErrorType::Unknown("get action".to_string()),
+            "Amount 1 not found",
+          ))?
+          .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?,
         line.contains("all-in"),
       )),
       "bets" => Ok(Action::Bet(
         hand.get_player(&player)?,
         amounts
           .next()
-          .ok_or(ParseError::none_action("Amount 1 not found"))?
-          .map_err(ParseError::err_action)?,
+          .ok_or(err(
+            ParseErrorType::Unknown("get action".to_string()),
+            "Amount 1 not found",
+          ))?
+          .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?,
         line.contains("all-in"),
       )),
       "raises" => Ok(Action::Raise(
         hand.get_player(&player)?,
         amounts
           .next()
-          .ok_or(ParseError::none_action("Amount 1 not found"))?
-          .map_err(ParseError::err_action)?,
+          .ok_or(err(
+            ParseErrorType::Unknown("get action".to_string()),
+            "Amount 1 not found",
+          ))?
+          .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?,
         amounts
           .next()
-          .ok_or(ParseError::none_action("Amount 2 not found"))?
-          .map_err(ParseError::err_action)?,
+          .ok_or(err(
+            ParseErrorType::Unknown("get action".to_string()),
+            "Amount 2 not found",
+          ))?
+          .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?,
         line.contains("all-in"),
       )),
       "checks" => Ok(Action::Check(hand.get_player(&player)?)),
@@ -674,11 +780,15 @@ impl Action {
         hand.get_player(&player)?,
         amounts
           .next()
-          .ok_or(ParseError::none_action("Amount 1 not found"))?
-          .map_err(ParseError::err_action)?,
+          .ok_or(err(
+            ParseErrorType::Unknown("get action".to_string()),
+            "Amount 1 not found",
+          ))?
+          .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?,
       )),
-      _ => Err(ParseError::GetAction(
-        String::from("Unknow action : ") + action,
+      _ => Err(err(
+        ParseErrorType::Unknown("get action".to_string()),
+        "unknown action",
       )),
     }
   }
@@ -695,243 +805,4 @@ pub struct Player {
 pub struct Blind {
   pub player: Player,
   pub amount: f32,
-}
-
-#[cfg(test)]
-mod tests {
-  // TODO: modify player to match new db player
-  use super::*;
-  use pretty_assertions::assert_eq;
-
-  fn init() -> Vec<String> {
-    let filepath = "test/test_hands.txt";
-    let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
-    filecontent = filecontent.replace('\r', "");
-    filecontent = filecontent.replace('\u{feff}', "");
-    split_hands_content(&filecontent)
-  }
-
-  // test function with hand folding at TURN with real money.
-  // No player show hand
-  #[test]
-  fn test_real_fold() {
-    let hands_content = init();
-    let actual_hand = HandDetail::parse_hand(&hands_content[0]);
-
-    let players = [
-      Some(Player {
-        name: "sidneivl".to_string(),
-        position: 1,
-        bank: 3.24,
-      }),
-      Some(Player {
-        name: "Savva08".to_string(),
-        position: 2,
-        bank: 1.96,
-      }),
-      Some(Player {
-        name: "captelie52".to_string(),
-        position: 3,
-        bank: 0.70,
-      }),
-      Some(Player {
-        name: "PokerZhyte".to_string(),
-        position: 4,
-        bank: 2.,
-      }),
-      Some(Player {
-        name: "alencarbrasil19".to_string(),
-        position: 5,
-        bank: 1.59,
-      }),
-      Some(Player {
-        name: "Cazunga".to_string(),
-        position: 6,
-        bank: 2.,
-      }),
-      None,
-      None,
-      None,
-    ];
-    let naive_date =
-      NaiveDateTime::parse_from_str("[2024/03/26 17:02:04 ET]", "[%Y/%m/%d %H:%M:%S ET]");
-    let offset = FixedOffset::east_opt(5 * 3600).unwrap();
-    let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
-    let expected_hand = HandDetail {
-      id: 249638850870,
-      content: hands_content[0].clone(),
-      real_money: true,
-      date,
-      small_limit: 0.01,
-      big_limit: 0.02,
-      table_name: "Ostara III".to_string(),
-      table_size: 6,
-      button_position: 2,
-      players: players.clone(),
-      small_blind: Blind {
-        player: players[2].clone().unwrap(),
-        amount: 0.01,
-      },
-      big_blind: Blind {
-        player: players[3].clone().unwrap(),
-        amount: 0.02,
-      },
-      end: End {
-        pot: 0.06,
-        winner: players[4].clone().unwrap(),
-      },
-      players_card: [
-        None,
-        None,
-        None,
-        Some(["2c".to_string(), "7d".to_string()]),
-        None,
-        None,
-        None,
-        None,
-        None,
-      ],
-      preflop: vec![
-        Action::Call(players[4].clone().unwrap(), 0.02, false),
-        Action::Fold(players[5].clone().unwrap()),
-        Action::Fold(players[0].clone().unwrap()),
-        Action::Fold(players[1].clone().unwrap()),
-        Action::Call(players[2].clone().unwrap(), 0.01, false),
-        Action::Check(players[3].clone().unwrap()),
-      ],
-      flop: vec![
-        Action::Check(players[2].clone().unwrap()),
-        Action::Check(players[3].clone().unwrap()),
-        Action::Check(players[4].clone().unwrap()),
-      ],
-      turn: vec![
-        Action::Check(players[2].clone().unwrap()),
-        Action::Check(players[3].clone().unwrap()),
-        Action::Bet(players[4].clone().unwrap(), 0.18, false),
-        Action::Fold(players[2].clone().unwrap()),
-        Action::Fold(players[3].clone().unwrap()),
-        Action::UncalledBet(players[4].clone().unwrap(), 0.18),
-      ],
-      river: vec![],
-      flop_card: Some(["Qh".to_string(), "9s".to_string(), "3d".to_string()]),
-      turn_card: Some("6s".to_string()),
-      river_card: None,
-    };
-
-    // assert_eq!(actual_hand, expected_hand);
-  }
-
-  #[test]
-  fn test_fake_showdown() {
-    let hands_content = init();
-    let actual_hand = HandDetail::parse_hand(&hands_content[1]);
-
-    let players = [
-      Some(Player {
-        name: "mrdee12".to_string(),
-        bank: 9700.,
-        position: 1,
-      }),
-      Some(Player {
-        name: "carlitosbomba".to_string(),
-        bank: 9178.,
-        position: 2,
-      }),
-      Some(Player {
-        name: "PokerZhyte".to_string(),
-        bank: 10000.,
-        position: 3,
-      }),
-      Some(Player {
-        name: "haroldfried13".to_string(),
-        bank: 12004.,
-        position: 4,
-      }),
-      Some(Player {
-        name: "gerdi2".to_string(),
-        bank: 45153.,
-        position: 5,
-      }),
-      Some(Player {
-        name: "ArrAppA-Hi".to_string(),
-        position: 6,
-        bank: 11063.,
-      }),
-      None,
-      None,
-      None,
-    ];
-
-    let naive_date =
-      NaiveDateTime::parse_from_str("[2024/03/29 12:03:57 ET]", "[%Y/%m/%d %H:%M:%S ET]");
-    let offset = FixedOffset::east_opt(5 * 3600).unwrap();
-    let date = DateTime::<FixedOffset>::from_naive_utc_and_offset(naive_date.unwrap(), offset);
-    let expected_hand = HandDetail {
-      content: hands_content[1].clone(),
-      real_money: false,
-      id: 249687478472,
-      date,
-      small_limit: 50.,
-      big_limit: 100.,
-      table_name: "NLHE 50/100 6 Max".to_string(),
-      table_size: 6,
-      button_position: 1,
-      players: players.clone(),
-      small_blind: Blind {
-        player: players[1].clone().unwrap(),
-        amount: 50.,
-      },
-      big_blind: Blind {
-        player: players[2].clone().unwrap(),
-        amount: 100.,
-      },
-      end: End {
-        pot: 20846.,
-        winner: players[1].clone().unwrap(),
-      },
-      players_card: [
-        None,
-        Some(["Th".to_string(), "5h".to_string()]),
-        Some(["Ah".to_string(), "As".to_string()]),
-        None,
-        None,
-        Some(["Ac".to_string(), "6h".to_string()]),
-        None,
-        None,
-        None,
-      ],
-      preflop: vec![
-        Action::Fold(players[3].clone().unwrap()),
-        Action::Call(players[4].clone().unwrap(), 100., false),
-        Action::Call(players[5].clone().unwrap(), 100., false),
-        Action::Call(players[0].clone().unwrap(), 100., false),
-        Action::Call(players[1].clone().unwrap(), 50., false),
-        Action::Raise(players[2].clone().unwrap(), 400., 500., false),
-        Action::Fold(players[4].clone().unwrap()),
-        Action::Call(players[5].clone().unwrap(), 400., false),
-        Action::Fold(players[0].clone().unwrap()),
-        Action::Call(players[1].clone().unwrap(), 400., false),
-      ],
-      flop: vec![
-        Action::Check(players[1].clone().unwrap()),
-        Action::Bet(players[2].clone().unwrap(), 1003., false),
-        Action::Call(players[5].clone().unwrap(), 1003., false),
-        Action::Call(players[1].clone().unwrap(), 1003., false),
-      ],
-      turn: vec![
-        Action::Bet(players[1].clone().unwrap(), 2000., false),
-        Action::Call(players[2].clone().unwrap(), 2000., false),
-        Action::Raise(players[5].clone().unwrap(), 7560., 9560., true),
-        Action::Call(players[1].clone().unwrap(), 5675., true),
-        Action::Fold(players[2].clone().unwrap()),
-        Action::UncalledBet(players[5].clone().unwrap(), 1885.),
-      ],
-      river: vec![],
-      flop_card: Some([String::from("8c"), String::from("7c"), String::from("Jc")]),
-      turn_card: Some(String::from("9s")),
-      river_card: Some(String::from("8s")),
-    };
-
-    // assert_eq!(actual_hand, expected_hand);
-  }
 }

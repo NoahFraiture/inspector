@@ -24,7 +24,7 @@ fn main() {
   println!("first file : {:#?}", files[0]);
 
   let hands_detail = match parse::parse_file(&files[0]) {
-    Err(e) => panic!("Error {:#?}\nparsing file : {:#?}", e, files[0]),
+    Err(e) => panic!("Error {}\nparsing file : {:#?}", e, files[0]),
     Ok(h) => h,
   };
   println!("number of hands : {:#?}", hands_detail.len());
