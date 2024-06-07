@@ -69,6 +69,7 @@ dependencies = [
  "chrono",
  "diesel",
  "dotenvy",
+ "lazy_static",
  "pretty_assertions",
  "rand 0.8.5",
  "regex",

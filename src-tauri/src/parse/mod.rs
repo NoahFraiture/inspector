@@ -1,11 +1,12 @@
 use app::models::Hand;
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
-use regex::Regex;
 use std::fmt;
 use std::fs;
 use std::str::Lines;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+mod re;
 
 pub fn parse_file(filepath: &str) -> Result<Vec<HandDetail>, ParseError> {
   let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
@@ -268,8 +269,7 @@ fn err_msg(t: ParseErrorType, e: impl std::string::ToString, msg: &str) -> Parse
 // ========================================
 
 fn extract_id(line: &str) -> Result<i64, ParseError> {
-  let re = Regex::new(r"#(\d+)").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_id = re
+  let capture_id = re::TABLE_ID
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Id regex failed"))?;
   let mut chars = capture_id[0].chars();
@@ -281,8 +281,7 @@ fn extract_id(line: &str) -> Result<i64, ParseError> {
 }
 
 fn extract_date(line: &str) -> Result<DateTime<FixedOffset>, ParseError> {
-  let re = Regex::new(r"\[(.*?)\]").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_date = re
+  let capture_date = re::BRACKET
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Date regex failed"))?;
   let date_string = capture_date[0].to_string();
@@ -299,9 +298,8 @@ fn extract_date(line: &str) -> Result<DateTime<FixedOffset>, ParseError> {
 }
 
 fn extract_limits(line: &str) -> Result<(f32, f32), ParseError> {
-  let re = Regex::new(r"\(\$?(\d+\.)?\d+\/\$?(\d+\.)?\d+( USD)?\)")
-    .map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_limites = re
+  // replace by simple number match and take 2nd and 3rd
+  let capture_limites = re::LIMIT
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Limit not found"))?;
   let limits_str = capture_limites[0].to_string();
@@ -325,8 +323,7 @@ fn extract_limits(line: &str) -> Result<(f32, f32), ParseError> {
 }
 
 fn extract_table_name(line: &str) -> Result<String, ParseError> {
-  let re = Regex::new(r"'([^']*)'").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_table_name = re
+  let capture_table_name = re::TABLE_NAME
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Table name regex failed"))?;
   let mut chars = capture_table_name[0].chars();
@@ -336,8 +333,7 @@ fn extract_table_name(line: &str) -> Result<String, ParseError> {
 }
 
 fn extract_button_position(line: &str) -> Result<u8, ParseError> {
-  let re = Regex::new(r"#(\d+)").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_button_position = re
+  let capture_button_position = re::TABLE_ID
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Button position regex failed"))?;
   let mut chars = capture_button_position[0].chars();
@@ -349,8 +345,7 @@ fn extract_button_position(line: &str) -> Result<u8, ParseError> {
 }
 
 fn extract_table_size(line: &str) -> Result<u8, ParseError> {
-  let re = Regex::new(r"(\d+)-max").unwrap();
-  let capture_table_size = re.captures(line).unwrap();
+  let capture_table_size = re::TABLE_SIZE.captures(line).unwrap();
   let mut chars = capture_table_size[0].chars();
   chars.next_back();
   chars.next_back();
@@ -363,15 +358,13 @@ fn extract_table_size(line: &str) -> Result<u8, ParseError> {
 }
 
 fn extract_blind(hand: &HandDetail, line: &str) -> Result<Blind, ParseError> {
-  let re = Regex::new(r".*:").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_player = re
+  let capture_player = re::BEFORE_COLON
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "extracting blind"))?;
   let player = hand
     .get_player(&capture_player[0].replace([':'], ""))
     .map_err(|e| err(ParseErrorType::Start, e))?;
-  let amount_re = Regex::new(r"\$?(\d+\.)?\d+").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture = amount_re
+  let capture = re::MONEY
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Can't find amount in blind"))?;
   let amount = capture[0]
@@ -382,21 +375,18 @@ fn extract_blind(hand: &HandDetail, line: &str) -> Result<Blind, ParseError> {
 }
 
 fn extract_seat(line: &str) -> Result<Player, ParseError> {
-  let position_re = Regex::new(r"[0-9]").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_position = position_re
+  let capture_position = re::NUMBER
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Position not found"))?;
   let position = capture_position[0]
     .replace(':', "")
     .parse::<u8>()
     .map_err(|e| err(ParseErrorType::Start, e))?;
-  let name_re = Regex::new(r": .* \(").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_name = name_re
+  let capture_name = re::AFTER_COLON_P
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Name not found"))?;
   let name = String::from(capture_name[0].replace([':', '('], "").trim());
-  let bank_re = Regex::new(r"\(\$?(\d+\.)?\d+ ").map_err(|e| err(ParseErrorType::Start, e))?;
-  let capture_bank = bank_re
+  let capture_bank = re::MONEY_BRACED
     .captures(line)
     .ok_or(err(ParseErrorType::Start, "Bank not found"))?;
   let bank = capture_bank[0]
@@ -447,8 +437,7 @@ fn start(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> {
 
 fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
   let line = lines.next().unwrap();
-  let player_re = Regex::new(r"to .*\[").map_err(|e| err(ParseErrorType::Preflop, e))?;
-  let player_capture = player_re
+  let player_capture = re::DEALT
     .captures(line)
     .ok_or(err(ParseErrorType::Preflop, "capture player"))?;
   let mut player_chars = player_capture[0].chars();
@@ -466,8 +455,8 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError>
     .get_player(player_chars.as_str().trim())
     .map_err(|e| err(ParseErrorType::Preflop, e))?;
 
-  let cards_re = Regex::new(r"\[.. ..\]").map_err(|e| err(ParseErrorType::Preflop, e))?;
-  let cards_capture = cards_re
+  // WARN: suppose the user can't have '['
+  let cards_capture = re::BRACKET
     .captures(line)
     .ok_or(err(ParseErrorType::Preflop, "capture cards"))?;
   let binding = cards_capture[0].replace(['[', ']'], "");
@@ -484,8 +473,7 @@ fn preflop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError>
     if line.starts_with("*** FLOP ***") {
       // 500us
       // TODO : check error of regex, fuck it for now
-      let re = Regex::new(r"\[.. .. ..\]").unwrap();
-      let capture_card = re.captures(line).unwrap();
+      let capture_card = &re::BRACKET.captures(line).unwrap();
       let binding = capture_card[0].replace(['[', ']'], "");
       let mut cards = binding.split_whitespace();
       let card1 = cards
@@ -521,7 +509,7 @@ fn flop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
       return Ok(false);
     }
     if line.starts_with("*** TURN ***") {
-      let cards_re = Regex::new(r"\[..\]").map_err(|e| err(ParseErrorType::Preflop, e))?;
+      let cards_re = &re::BRACKET;
       let cards_capture = cards_re
         .captures(line)
         .ok_or(err(ParseErrorType::Preflop, "capture cards"))?;
@@ -548,9 +536,15 @@ fn turn(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
       return Ok(false);
     }
     if line.starts_with("*** RIVER ***") {
-      let re = Regex::new(r"\[(..)\]").unwrap();
-      let capture_card = re.captures(line).unwrap();
-      hand.river_card = Some(capture_card[1].to_string().replace(['[', ']'], ""));
+      let mut capture_card = re::BRACKET.captures_iter(line);
+      capture_card.next();
+      hand.river_card = Some(
+        capture_card
+          .next()
+          .ok_or(err(ParseErrorType::Turn, "error in getting turn card"))?[0]
+          .to_string()
+          .replace(['[', ']'], ""),
+      );
       return Ok(true);
     }
     if Action::is_action(line) {
@@ -592,8 +586,7 @@ fn showdown(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> 
     }
     // NOTE: ignore muck
     if line.contains("shows") {
-      let player_re = Regex::new(r".*:").unwrap();
-      let player_capture = player_re
+      let player_capture = re::BEFORE_COLON
         .captures(line)
         .ok_or(err(ParseErrorType::Showdown, "player not found"))?;
 
@@ -603,8 +596,7 @@ fn showdown(hand: &mut HandDetail, lines: &mut Lines) -> Result<(), ParseError> 
         .get_player(&player_name)
         .map_err(|e| err(ParseErrorType::Showdown, e))?;
 
-      let re = Regex::new(r"\[(.. ..)\]").unwrap();
-      let capture_card = re
+      let capture_card = re::BRACKET
         .captures(line)
         .ok_or(err(ParseErrorType::Showdown, "cards not found"))?;
       let cards_str = capture_card[0].replace(['[', ']'], "");
@@ -628,15 +620,13 @@ pub struct End {
 
 impl End {
   fn extract_end(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
-    let player_re = Regex::new(r".* collected").unwrap();
-    let player_capture = player_re.captures(line).unwrap();
+    let player_capture = &re::BEFORE_COLLECTED.captures(line).unwrap();
     let mut words = player_capture[0].split_whitespace();
     words.next_back().unwrap();
     let player_name = words.collect::<Vec<&str>>().join(" ");
     let winner = hand.get_player(&player_name)?;
 
-    let pot_re = Regex::new(r"collected \$?(\d+\.)?\d+").unwrap();
-    let pot_capture = pot_re.captures(line).unwrap();
+    let pot_capture = re::AFTER_COLLECTED.captures(line).unwrap();
     let pot_str = pot_capture[0].split_whitespace().nth(1).ok_or(err(
       ParseErrorType::Unknown("End".to_string()),
       "error in pot reading",
@@ -673,9 +663,7 @@ impl Action {
 
   // need a special treatement
   fn get_uncalled(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
-    let amount_re = Regex::new(r"\(\$?(\d+\.)?\d+")
-      .map_err(|e| err(ParseErrorType::Unknown("get uncalled".to_string()), e))?;
-    let capture = amount_re.captures(line).ok_or(err(
+    let capture = re::MONEY_BRACED.captures(line).ok_or(err(
       ParseErrorType::Unknown("get uncalled".to_string()),
       "Can't find amount in uncalled",
     ))?;
@@ -697,35 +685,27 @@ impl Action {
       return Action::get_uncalled(hand, line);
     }
 
-    let player_re =
-      Regex::new(r".*:").map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
-    let capture_position = player_re.captures(line).ok_or(err(
+    let capture_position = re::BEFORE_COLON.captures(line).ok_or(err(
       ParseErrorType::Unknown("get action".to_string()),
       "player not found",
     ))?;
     let player = capture_position[0].replace([':'], "");
 
-    let line_after_player_re =
-      Regex::new(r":.*").map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
-    let capture_after = line_after_player_re.captures(line).ok_or(err(
+    let capture_after = re::AFTER_COLON.captures(line).ok_or(err(
       ParseErrorType::Unknown("get action".to_string()),
       "capture after",
     ))?;
     let binding = capture_after[0].replace([':'], "");
     let line = &binding.trim();
 
-    let action_re =
-      Regex::new(r"\w+").map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
-    let capture_action = action_re.captures(line).ok_or(err(
+    let capture_action = re::WORD.captures(line).ok_or(err(
       ParseErrorType::Unknown("get action".to_string()),
       "capture action",
     ))?;
     let binding = capture_action[0].replace([':', '$'], "");
     let action = binding.trim();
 
-    let amount_re = Regex::new(r"\$?(\d+\.)?\d+")
-      .map_err(|e| err(ParseErrorType::Unknown("get action".to_string()), e))?;
-    let captures_amount = amount_re.captures_iter(line);
+    let captures_amount = re::MONEY.captures_iter(line);
     let mut amounts = captures_amount
       .map(|a| a[0].replace(['$'], ""))
       .map(|a| a.parse::<f32>());
