@@ -16,6 +16,7 @@ pub fn add(player: &mut models::Player, hands: Vec<parse::HandDetail>) {
   let mut nb_squeeze = player.squeeze * player.nb_can_squeeze;
 
   for hand in hands {
+    player.nb_hand += 1.;
     let participation = PlayerParticipation::new(&hand, &player.name);
     if participation.vpip {
       nb_vpip += 1.;
@@ -301,7 +302,7 @@ fn cbet_find(hand: &parse::HandDetail, name: &str) -> Bool {
       _ => {}
     }
   }
-  if !open {
+  if !open || hand.flop.is_empty() {
     return Bool::Impossible;
   }
 
@@ -413,7 +414,7 @@ fn squeeze_find(hand: &parse::HandDetail, name: &str) -> Bool {
       _ => {}
     }
   }
-  panic!("Should not reach here");
+  Bool::Impossible
 }
 
 enum Bool {

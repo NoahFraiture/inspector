@@ -364,8 +364,13 @@ fn extract_blind(hand: &HandDetail, line: &str) -> Result<Blind, ParseError> {
   let player = hand
     .get_player(&capture_player[0].replace([':'], ""))
     .map_err(|e| err(ParseErrorType::Start, e))?;
+  let after_line = re::AFTER_COLON.captures(line).ok_or(err(
+    ParseErrorType::Start,
+    "unable to get the line after colon",
+  ))?;
+  let line = after_line[0].to_string();
   let capture = re::MONEY
-    .captures(line)
+    .captures(&line)
     .ok_or(err(ParseErrorType::Start, "Can't find amount in blind"))?;
   let amount = capture[0]
     .replace(['('], "")

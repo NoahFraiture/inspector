@@ -65,7 +65,7 @@ pub struct HoldCard {
   pub card2: String,
 }
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Debug)]
 #[diesel(table_name = crate::schema::player)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Player {

@@ -9,7 +9,7 @@ mod stats;
 
 use core::panic;
 
-use self::models::*;
+use self::models;
 use app::*;
 use diesel::prelude::*;
 
@@ -32,21 +32,8 @@ fn main() {
   };
   println!("number of hands : {:#?}", hands_detail.len());
 
-  // map the hands to transform every element to a Hand and then insert into the db
-  for hand_detail in hands_detail {
-    let hand = hand_detail.to_hand();
-  }
-
-  let connection = &mut establish_connection();
-  let results = schema::hand::dsl::hand
-    .select(Hand::as_select())
-    .load(connection)
-    .expect("Error loading posts");
-
-  println!("Displaying {} posts", results.len());
-  for h in results {
-    println!("{}", h.winner);
-    println!("-----------\n");
-    println!("{}", h.pot);
-  }
+  let mut poker_zhyte = models::Player::new("PokerZhyte");
+  println!("player before stats : {:#?}", poker_zhyte);
+  stats::add(&mut poker_zhyte, hands_detail);
+  println!("player after stats : {:#?}", poker_zhyte);
 }
