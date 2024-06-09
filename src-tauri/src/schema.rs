@@ -89,4 +89,10 @@ diesel::joinable!(action -> hand (hand));
 diesel::joinable!(blind -> hand (hand));
 diesel::joinable!(holeCard -> hand (hand));
 
-diesel::allow_tables_to_appear_in_same_query!(action, blind, hand, holeCard, player,);
+diesel::allow_tables_to_appear_in_same_query!(
+    action,
+    blind,
+    hand,
+    holeCard,
+    player,
+);
