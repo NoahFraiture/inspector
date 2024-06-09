@@ -5,6 +5,17 @@ use diesel::prelude::*;
 use dotenvy::dotenv;
 use std::env;
 
+pub enum DBErrorType {
+  Connection,
+  Insert,
+  Select,
+}
+
+pub struct DBError {
+  t: DBErrorType,
+  msg: String,
+}
+
 pub fn establish_connection() -> SqliteConnection {
   dotenv().ok();
 
