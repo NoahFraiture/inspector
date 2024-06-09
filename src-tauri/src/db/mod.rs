@@ -20,3 +20,16 @@ pub fn insert_hand(conn: &mut SqliteConnection, hand: &models::Hand) -> models::
     .get_result(conn)
     .expect("Error saving new hand")
 }
+
+pub fn show_hands(conn: &mut SqliteConnection) {
+  use crate::db::models::Hand;
+  use crate::db::schema::hand::dsl::*;
+  let result = hand
+    .filter(time.gt(1))
+    .select(Hand::as_select())
+    .load(conn)
+    .unwrap();
+  for h in result {
+    println!("h : {:#?}", h);
+  }
+}

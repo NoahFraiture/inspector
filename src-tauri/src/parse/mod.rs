@@ -194,7 +194,10 @@ impl HandDetail {
         .as_ref()
         .map_or(String::new(), |cards| cards[2].clone()),
       card4: self.turn_card.as_ref().map_or(String::new(), |c| c.clone()),
-      card5: self.turn_card.as_ref().map_or(String::new(), |c| c.clone()),
+      card5: self
+        .river_card
+        .as_ref()
+        .map_or(String::new(), |c| c.clone()),
     }
   }
 
@@ -514,12 +517,15 @@ fn flop(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
       return Ok(false);
     }
     if line.starts_with("*** TURN ***") {
-      let cards_re = &re::BRACKET;
-      let cards_capture = cards_re
-        .captures(line)
-        .ok_or(err(ParseErrorType::Preflop, "capture cards"))?;
-      let card = cards_capture[0].replace(['[', ']'], "").to_string();
-      hand.turn_card = Some(card);
+      let mut capture_card = re::BRACKET.captures_iter(line);
+      capture_card.next();
+      hand.turn_card = Some(
+        capture_card
+          .next()
+          .ok_or(err(ParseErrorType::Turn, "error in getting turn card"))?[0]
+          .to_string()
+          .replace(['[', ']'], ""),
+      );
       return Ok(true);
     }
 
@@ -685,7 +691,6 @@ impl Action {
   }
 
   fn get_action(hand: &HandDetail, line: &str) -> Result<Self, ParseError> {
-    let s = Instant::now();
     if line.starts_with("Uncalled bet") {
       return Action::get_uncalled(hand, line);
     }

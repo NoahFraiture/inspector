@@ -10,6 +10,9 @@ mod stats;
 
 use core::panic;
 use db::models;
+use diesel::Insertable;
+
+use crate::db::establish_connection;
 
 fn main() {
   let directory = "/mnt/windows/Users/noah/AppData/Local/PokerStars.BE/HandHistory/PokerZhyte/play";
@@ -38,4 +41,9 @@ fn main() {
   let hand = hands_detail[0].to_hand();
   println!("Hand detail : {:#?}", hands_detail[0]);
   println!("hand from hand_detail : {:#?}", hand);
+
+  let mut conn = establish_connection();
+  db::insert_hand(&mut conn, &hand);
+
+  db::show_hands(&mut conn);
 }
