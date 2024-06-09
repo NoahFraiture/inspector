@@ -1,11 +1,11 @@
+use crate::models;
 use crate::parse;
-use app::models;
 
 // This use the HandDetai computed from the text
 // This means that these data can't be computed from the Hand directly from
 // the SQL database. However there's the textual content of the hand in the
 // SQL DB, which means you could recomputed HandDetail and all stats
-pub fn add(player: &mut models::Player, hands: Vec<parse::HandDetail>) {
+pub fn add(player: &mut models::Player, hands: &Vec<parse::HandDetail>) {
   let mut nb_vpip = player.vpip * player.nb_hand;
   let mut nb_pfr = player.pfr * player.nb_hand;
 

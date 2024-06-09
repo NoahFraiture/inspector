@@ -1,7 +1,8 @@
+use crate::db::schema;
 use diesel::prelude::*;
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::action)]
+#[diesel(table_name = schema::action)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Action {
   pub id: i32,
@@ -16,7 +17,7 @@ pub struct Action {
 }
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::blind)]
+#[diesel(table_name = schema::blind)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Blind {
   pub id: i32,
@@ -26,8 +27,8 @@ pub struct Blind {
   pub kind: String,
 }
 
-#[derive(Queryable, Selectable, Insertable)]
-#[diesel(table_name = crate::schema::hand)]
+#[derive(Queryable, Selectable, Insertable, Debug)]
+#[diesel(table_name = schema::hand)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Hand {
   pub id: i64,
@@ -55,7 +56,7 @@ pub struct Hand {
 }
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::holeCard)]
+#[diesel(table_name = schema::holeCard)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct HoldCard {
   pub id: i32,
@@ -66,7 +67,7 @@ pub struct HoldCard {
 }
 
 #[derive(Queryable, Selectable, Debug)]
-#[diesel(table_name = crate::schema::player)]
+#[diesel(table_name = schema::player)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Player {
   pub name: String,

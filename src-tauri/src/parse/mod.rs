@@ -1,4 +1,4 @@
-use app::models::Hand;
+use crate::models::Hand;
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
 use std::fmt;
 use std::fs;
