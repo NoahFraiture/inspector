@@ -10,7 +10,6 @@ mod stats;
 
 use core::panic;
 use db::models;
-use diesel::Insertable;
 
 use crate::db::establish_connection;
 
@@ -42,8 +41,8 @@ fn main() {
   println!("Hand detail : {:#?}", hands_detail[0]);
   println!("hand from hand_detail : {:#?}", hand);
 
-  let mut conn = establish_connection();
-  db::insert_hand(&mut conn, &hand);
+  let mut conn = establish_connection().unwrap();
+  db::insert_hand(&mut conn, &hand).unwrap();
 
-  db::show_hands(&mut conn);
+  db::show_hands(&mut conn).unwrap();
 }
