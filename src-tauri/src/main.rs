@@ -7,9 +7,11 @@ extern crate lazy_static;
 mod db;
 mod parse;
 mod stats;
+mod track;
 
 use core::panic;
 use db::models;
+use std::path::Path;
 
 use crate::db::establish_connection;
 
@@ -42,7 +44,17 @@ fn main() {
   println!("hand from hand_detail : {:#?}", hand);
 
   let mut conn = establish_connection().unwrap();
-  db::insert_hand(&mut conn, &hand).unwrap();
-
+  db::insert_hand(&mut conn, &hand);
   db::show_hands(&mut conn).unwrap();
+
+  env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+
+  use std::sync::mpsc::channel;
+  let (tx, rx) = channel();
+
+  let path = Path::new(r"/home/noah/test");
+  if let Err(error) = track::watch(path, tx, rx) {
+    log::error!("Error : {error:?}");
+  }
+  println!("here");
 }
