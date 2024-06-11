@@ -11,6 +11,8 @@ mod track;
 
 use core::panic;
 use db::models;
+use diesel::SqliteConnection;
+use parse::HandDetail;
 use std::path::Path;
 
 use crate::db::establish_connection;
@@ -39,7 +41,7 @@ fn main() {
   println!("player after stats : {:#?}", poker_zhyte);
 
   // compute hand of DB from hand detail
-  let hand = hands_detail[0].to_hand();
+  let hand = hands_detail[0].get_hand();
   println!("Hand detail : {:#?}", hands_detail[0]);
   println!("hand from hand_detail : {:#?}", hand);
 
@@ -57,4 +59,13 @@ fn main() {
     log::error!("Error : {error:?}");
   }
   println!("here");
+}
+
+fn update_db(conn: &mut SqliteConnection, hands_detail: &Vec<HandDetail>) {
+  for hand_detail in hands_detail {
+    let hand = hand_detail.get_hand();
+    db::insert_hand(conn, &hand);
+
+    let actions = hand_detail.get_actions();
+  }
 }

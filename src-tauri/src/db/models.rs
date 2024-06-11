@@ -58,7 +58,7 @@ pub struct Hand {
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = schema::holeCard)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct HoldCard {
+pub struct HoleCard {
   pub id: i32,
   pub hand: i64,
   pub player: String,
