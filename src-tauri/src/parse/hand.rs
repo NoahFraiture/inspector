@@ -1,4 +1,3 @@
-use crate::models::Hand;
 use chrono::{DateTime, FixedOffset};
 
 // This structure will be used to compute the stats of the player
@@ -27,9 +26,82 @@ pub struct HandDetail {
   pub river_card: Option<String>,
 }
 
+use crate::models;
 impl HandDetail {
-  pub fn get_hand(&self) -> Hand {
-    Hand {
+  pub fn get_actions(&self) -> Vec<models::Action> {
+    let mut actions: Vec<models::Action> = Vec::new();
+    let mut sequence = 0;
+
+    for action in &self.preflop {
+      actions.push(HandDetail::create_action(
+        action, "preflop", sequence, self.id,
+      ));
+      sequence += 1;
+    }
+    for action in &self.flop {
+      actions.push(HandDetail::create_action(action, "flop", sequence, self.id));
+      sequence += 1;
+    }
+    for action in &self.turn {
+      actions.push(HandDetail::create_action(action, "turn", sequence, self.id));
+      sequence += 1;
+    }
+    for action in &self.river {
+      actions.push(HandDetail::create_action(
+        action, "river", sequence, self.id,
+      ));
+      sequence += 1;
+    }
+    actions
+  }
+
+  fn create_action(action: &Action, moment: &str, sequence: i32, foreign: i64) -> models::Action {
+    let mut object = models::Action {
+      player: "".to_string(),
+      hand: foreign,
+      kind: "".to_string(),
+      moment: moment.to_string(),
+      sequence,
+      amount1: 0., // placeholder
+      amount2: 0., // placeholder
+      allin: false,
+    };
+    match action {
+      Action::Call(player, amount, allin) => {
+        object.player = player.name.clone();
+        object.amount1 = *amount;
+        object.allin = *allin;
+      }
+      Action::Bet(player, amount, allin) => {
+        object.player = player.name.clone();
+        object.amount1 = *amount;
+        object.allin = *allin;
+      }
+      Action::Raise(player, amount1, amount2, allin) => {
+        object.player = player.name.clone();
+        object.amount1 = *amount1;
+        object.amount1 = *amount2;
+        object.allin = *allin;
+      }
+      Action::Check(player) => {
+        object.player = player.name.clone();
+      }
+      Action::Fold(player) => {
+        object.player = player.name.clone();
+      }
+      Action::Leave(player) => {
+        object.player = player.name.clone();
+      }
+      Action::UncalledBet(player, amount) => {
+        object.player = player.name.clone();
+        object.amount1 = *amount;
+      }
+    };
+    object
+  }
+
+  pub fn get_hand(&self) -> models::Hand {
+    models::Hand {
       id: self.id,
       content: self.content.clone(),
       real_money: self.real_money,

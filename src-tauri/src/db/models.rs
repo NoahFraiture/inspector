@@ -5,7 +5,6 @@ use diesel::prelude::*;
 #[diesel(table_name = schema::action)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Action {
-  pub id: i32,
   pub player: String,
   pub hand: i64,
   pub kind: String,
