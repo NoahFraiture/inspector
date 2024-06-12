@@ -106,9 +106,8 @@ pub fn get_players(
   use crate::db::models::Player;
   use crate::db::schema::player::dsl::{name, player};
 
-  let players: Vec<Player> = Vec::new();
   let result = player
-    .filter(name.eq_any(name))
+    .filter(name.eq_any(names))
     .select(Player::as_select())
     .load(conn)
     .map_err(|e| DBError::err(DBErrorType::Select, e))?;

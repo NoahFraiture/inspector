@@ -1,4 +1,4 @@
-use crate::models;
+use crate::db::models;
 use crate::parse;
 
 // This use the HandDetai computed from the text

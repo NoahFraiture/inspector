@@ -26,7 +26,7 @@ pub struct HandDetail {
   pub river_card: Option<String>,
 }
 
-use crate::models;
+use crate::db::models;
 impl HandDetail {
   pub fn get_actions(&self) -> Vec<models::Action> {
     let mut actions: Vec<models::Action> = Vec::new();

@@ -33,20 +33,15 @@ fn main() {
     Err(e) => panic!("Error {}\nparsing file : {:#?}", e, files[0]),
     Ok(h) => h,
   };
+  println!("Number of hands {}", hands_detail.len());
 
   // compute the stats for PokerZhyte player
   let mut poker_zhyte = db::models::Player::new("PokerZhyte");
   stats::add(&mut poker_zhyte, &hands_detail);
-  println!("player after stats : {:#?}", poker_zhyte);
 
   // compute hand of DB from hand detail
-  let hand = hands_detail[0].get_hand();
-  println!("Hand detail : {:#?}", hands_detail[0]);
-  println!("hand from hand_detail : {:#?}", hand);
-
   let mut conn = establish_connection().unwrap();
-  db::insert_hand(&mut conn, &hand);
-  db::show_hands(&mut conn).unwrap();
+  update_db(&mut conn, &hands_detail);
 
   env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
@@ -57,7 +52,6 @@ fn main() {
   if let Err(error) = track::watch(path, tx, rx) {
     log::error!("Error : {error:?}");
   }
-  println!("here");
 }
 
 // miss player
