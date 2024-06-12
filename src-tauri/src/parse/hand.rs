@@ -174,7 +174,7 @@ impl HandDetail {
     (small, big)
   }
 
-  pub fn get_end(&self) -> Vec<models::HoleCard> {
+  pub fn get_hole_cards(&self) -> Vec<models::HoleCard> {
     let mut vec: Vec<models::HoleCard> = Vec::new();
     for i in 0..9 {
       if let Some(cards) = &self.players_card[i] {

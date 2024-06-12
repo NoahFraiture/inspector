@@ -10,7 +10,6 @@ mod stats;
 mod track;
 
 use core::panic;
-use db::models;
 use diesel::SqliteConnection;
 use parse::HandDetail;
 use std::path::Path;
@@ -36,7 +35,7 @@ fn main() {
   };
 
   // compute the stats for PokerZhyte player
-  let mut poker_zhyte = models::Player::new("PokerZhyte");
+  let mut poker_zhyte = db::models::Player::new("PokerZhyte");
   stats::add(&mut poker_zhyte, &hands_detail);
   println!("player after stats : {:#?}", poker_zhyte);
 
@@ -61,11 +60,20 @@ fn main() {
   println!("here");
 }
 
+// miss player
 fn update_db(conn: &mut SqliteConnection, hands_detail: &Vec<HandDetail>) {
   for hand_detail in hands_detail {
+    let actions: Vec<db::models::Action> = hand_detail.get_actions();
+    db::insert_actions(conn, &actions);
+
+    let (small_blind, big_blind) = hand_detail.get_blinds();
+    db::insert_blind(conn, &small_blind);
+    db::insert_blind(conn, &big_blind);
+
     let hand = hand_detail.get_hand();
     db::insert_hand(conn, &hand);
 
-    let actions = hand_detail.get_actions();
+    let hole_cards: Vec<db::models::HoleCard> = hand_detail.get_hole_cards();
+    db::insert_hole_cards(conn, &hole_cards);
   }
 }

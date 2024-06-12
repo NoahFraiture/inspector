@@ -1,7 +1,7 @@
 use crate::db::schema;
 use diesel::prelude::*;
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = schema::action)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Action {
@@ -15,7 +15,7 @@ pub struct Action {
   pub allin: bool,
 }
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = schema::blind)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Blind {
@@ -53,7 +53,7 @@ pub struct Hand {
   pub card5: String,
 }
 
-#[derive(Queryable, Selectable)]
+#[derive(Queryable, Selectable, Insertable)]
 #[diesel(table_name = schema::holeCard)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct HoleCard {
@@ -63,7 +63,7 @@ pub struct HoleCard {
   pub card2: String,
 }
 
-#[derive(Queryable, Selectable, Debug)]
+#[derive(Queryable, Selectable, Debug, Insertable)]
 #[diesel(table_name = schema::player)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Player {

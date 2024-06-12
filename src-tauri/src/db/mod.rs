@@ -45,6 +45,45 @@ pub fn insert_hand(
     .map_err(|e| DBError::err(DBErrorType::Insert, e))
 }
 
+pub fn insert_actions(
+  conn: &mut SqliteConnection,
+  actions: &Vec<models::Action>,
+) -> Result<(), DBError> {
+  for action in actions {
+    diesel::insert_into(schema::action::table)
+      .values(action)
+      .returning(models::Action::as_returning())
+      .get_result(conn)
+      .map_err(|e| DBError::err(DBErrorType::Insert, e))?;
+  }
+  Ok(())
+}
+
+pub fn insert_blind(
+  conn: &mut SqliteConnection,
+  blind: &models::Blind,
+) -> Result<models::Blind, DBError> {
+  diesel::insert_into(schema::blind::table)
+    .values(blind)
+    .returning(models::Blind::as_returning())
+    .get_result(conn)
+    .map_err(|e| DBError::err(DBErrorType::Insert, e))
+}
+
+pub fn insert_hole_cards(
+  conn: &mut SqliteConnection,
+  hole_cards: &Vec<models::HoleCard>,
+) -> Result<(), DBError> {
+  for hole_card in hole_cards {
+    diesel::insert_into(schema::holeCard::table)
+      .values(hole_card)
+      .returning(models::HoleCard::as_returning())
+      .get_result(conn)
+      .map_err(|e| DBError::err(DBErrorType::Insert, e))?;
+  }
+  Ok(())
+}
+
 pub fn show_hands(conn: &mut SqliteConnection) -> Result<(), DBError> {
   use crate::db::models::Hand;
   use crate::db::schema::hand::dsl::*;
@@ -58,4 +97,21 @@ pub fn show_hands(conn: &mut SqliteConnection) -> Result<(), DBError> {
     println!("h : {:#?}", h);
   }
   Ok(())
+}
+
+pub fn get_players(
+  conn: &mut SqliteConnection,
+  names: Vec<&str>,
+) -> Result<Vec<models::Player>, DBError> {
+  use crate::db::models::Player;
+  use crate::db::schema::player::dsl::{name, player};
+
+  let players: Vec<Player> = Vec::new();
+  let result = player
+    .filter(name.eq_any(name))
+    .select(Player::as_select())
+    .load(conn)
+    .map_err(|e| DBError::err(DBErrorType::Select, e))?;
+
+  Ok(result)
 }
