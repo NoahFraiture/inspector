@@ -101,7 +101,7 @@ fn extract_blind(hand: &HandDetail, line: &str) -> Result<Blind, ParseError> {
     .ok_or(ParseError::err(ParseErrorType::Start, "extracting blind"))?;
   let player = hand
     .get_player(&capture_player[0].replace([':'], ""))
-    .map_err(|e| ParseError::err(ParseErrorType::Start, e))?;
+    .map_err(|e| ParseError::err_msg(ParseErrorType::Start, e, "parsing player"))?;
   let after_line = re::AFTER_COLON.captures(line).ok_or(ParseError::err(
     ParseErrorType::Start,
     "unable to get the line after colon",
@@ -112,9 +112,15 @@ fn extract_blind(hand: &HandDetail, line: &str) -> Result<Blind, ParseError> {
     "Can't find amount in blind",
   ))?;
   let amount = capture[0]
-    .replace(['('], "")
+    .replace(['(', '$'], "")
     .parse::<f32>()
-    .map_err(|e| ParseError::err(ParseErrorType::Start, e))?;
+    .map_err(|e| {
+      ParseError::err_msg(
+        ParseErrorType::Start,
+        e,
+        &format!("parsing amount {}", &capture[0]),
+      )
+    })?;
   Ok(Blind { player, amount })
 }
 

@@ -11,6 +11,18 @@ mod start;
 use error::{ParseError, ParseErrorType};
 pub use hand::{Action, Blind, End, HandDetail, Player};
 
+use crate::db::schema::action::amount1;
+
+trait Dollar {
+  fn round_two_digit(self) -> f32;
+}
+
+impl Dollar for f32 {
+  fn round_two_digit(self) -> f32 {
+    (self * 100.).round() / 100.
+  }
+}
+
 pub fn parse_file(filepath: &str) -> Result<Vec<HandDetail>, ParseError> {
   let mut filecontent = fs::read_to_string(filepath).expect("Invalid file");
   filecontent = filecontent.replace('\r', "");
@@ -266,10 +278,13 @@ fn turn(hand: &mut HandDetail, lines: &mut Lines) -> Result<bool, ParseError> {
       return Ok(true);
     }
     if Action::is_action(line) {
-      hand.turn.push(
-        Action::get_action(hand, line)
-          .unwrap_or_else(|e| panic!("Error in turn action parsing : {}", e)),
-      );
+      hand.turn.push(Action::get_action(hand, line).map_err(|e| {
+        ParseError::err_msg(
+          ParseErrorType::River,
+          e,
+          &format!("action in line {}", line),
+        )
+      })?);
     } else if line.contains("collected") {
       hand.end = End::extract_end(hand, line)?; // FIXME : error
     }
@@ -339,17 +354,25 @@ impl End {
     let player_name = words.collect::<Vec<&str>>().join(" ");
     let winner = hand.get_player(&player_name)?;
 
-    let pot_capture = re::AFTER_COLLECTED.captures(line).unwrap();
-    let pot_str = pot_capture[0]
-      .split_whitespace()
-      .nth(1)
-      .ok_or(ParseError::err(
-        ParseErrorType::Unknown("End".to_string()),
-        "error in pot reading",
-      ))?;
+    let pot_capture = re::AFTER_COLLECTED.captures(line).ok_or(ParseError::err(
+      ParseErrorType::Unknown("End".to_string()),
+      "pot capture",
+    ))?;
+    let binding = pot_capture[0].replace(['$'], "");
+    let pot_str = binding.split_whitespace().nth(1).ok_or(ParseError::err(
+      ParseErrorType::Unknown("End".to_string()),
+      "error in pot reading",
+    ))?;
     let pot = pot_str
       .parse::<f32>()
-      .map_err(|e| ParseError::err(ParseErrorType::Unknown("End".to_string()), e))?;
+      .map(|p| p.round_two_digit())
+      .map_err(|e| {
+        ParseError::err_msg(
+          ParseErrorType::Unknown("End".to_string()),
+          e,
+          &format!("pot {}", pot_str),
+        )
+      })?;
     Ok(End { pot, winner })
   }
 }
@@ -372,9 +395,16 @@ impl Action {
       "Can't find amount in uncalled",
     ))?;
     let amount = capture[0]
-      .replace(['(', ')'], "")
+      .replace(['(', ')', '$'], "")
       .parse::<f32>()
-      .map_err(|e| ParseError::err(ParseErrorType::Unknown("get uncalled".to_string()), e))?;
+      .map(|p| p.round_two_digit())
+      .map_err(|e| {
+        ParseError::err_msg(
+          ParseErrorType::Unknown("get uncalled".to_string()),
+          e,
+          &format!("amount : '{}'", &capture[0]),
+        )
+      })?;
     let player = line
       .split_whitespace()
       .skip(5)
@@ -409,49 +439,35 @@ impl Action {
     let action = binding.trim();
 
     let captures_amount = re::MONEY.captures_iter(line);
-    let mut amounts = captures_amount
-      .map(|a| a[0].replace(['$'], ""))
-      .map(|a| a.parse::<f32>());
+    // FIXME shit
+    let amounts = {
+      let mut vec = Vec::new();
+      for cap in captures_amount {
+        let x = cap[0]
+          .replace(['$'], "")
+          .parse::<f32>()
+          .map(|p| p.round_two_digit())
+          .map_err(|e| ParseError::err(ParseErrorType::Unknown("get action".to_string()), e))?;
+        vec.push(x);
+      }
+      vec
+    };
 
     match action {
       "calls" => Ok(Action::Call(
         hand.get_player(&player)?,
-        amounts
-          .next()
-          .ok_or(ParseError::err(
-            ParseErrorType::Unknown("get action".to_string()),
-            "Amount 1 not found",
-          ))?
-          .map_err(|e| ParseError::err(ParseErrorType::Unknown("get action".to_string()), e))?,
+        *amounts.first().unwrap(),
         line.contains("all-in"),
       )),
       "bets" => Ok(Action::Bet(
         hand.get_player(&player)?,
-        amounts
-          .next()
-          .ok_or(ParseError::err(
-            ParseErrorType::Unknown("get action".to_string()),
-            "Amount 1 not found",
-          ))?
-          .map_err(|e| ParseError::err(ParseErrorType::Unknown("get action".to_string()), e))?,
+        *amounts.first().unwrap(),
         line.contains("all-in"),
       )),
       "raises" => Ok(Action::Raise(
         hand.get_player(&player)?,
-        amounts
-          .next()
-          .ok_or(ParseError::err(
-            ParseErrorType::Unknown("get action".to_string()),
-            "Amount 1 not found",
-          ))?
-          .map_err(|e| ParseError::err(ParseErrorType::Unknown("get action".to_string()), e))?,
-        amounts
-          .next()
-          .ok_or(ParseError::err(
-            ParseErrorType::Unknown("get action".to_string()),
-            "Amount 2 not found",
-          ))?
-          .map_err(|e| ParseError::err(ParseErrorType::Unknown("get action".to_string()), e))?,
+        *amounts.first().unwrap(),
+        *amounts.get(1).unwrap(),
         line.contains("all-in"),
       )),
       "checks" => Ok(Action::Check(hand.get_player(&player)?)),
@@ -461,13 +477,7 @@ impl Action {
       // TODO : add Uncalled action
       "bet" => Ok(Action::UncalledBet(
         hand.get_player(&player)?,
-        amounts
-          .next()
-          .ok_or(ParseError::err(
-            ParseErrorType::Unknown("get action".to_string()),
-            "Amount 1 not found",
-          ))?
-          .map_err(|e| ParseError::err(ParseErrorType::Unknown("get action".to_string()), e))?,
+        *amounts.first().unwrap(),
       )),
       _ => Err(ParseError::err(
         ParseErrorType::Unknown("get action".to_string()),

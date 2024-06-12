@@ -28,8 +28,10 @@ fn main() {
     files.push(path_str.to_string());
   }
 
+  let file = "./test/test_hands.txt";
+
   // parse the first file
-  let hands_detail = match parse::parse_file(&files[0]) {
+  let hands_detail = match parse::parse_file(file) {
     Err(e) => panic!("Error {}\nparsing file : {:#?}", e, files[0]),
     Ok(h) => h,
   };
