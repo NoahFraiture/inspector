@@ -19,7 +19,6 @@ pub struct Action {
 #[diesel(table_name = schema::blind)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct Blind {
-  pub id: i32,
   pub player: String,
   pub hand: i64,
   pub amount: f32,
@@ -58,7 +57,6 @@ pub struct Hand {
 #[diesel(table_name = schema::holeCard)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
 pub struct HoleCard {
-  pub id: i32,
   pub hand: i64,
   pub player: String,
   pub card1: String,

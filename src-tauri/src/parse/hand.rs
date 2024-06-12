@@ -156,6 +156,47 @@ impl HandDetail {
         .map_or(String::new(), |c| c.clone()),
     }
   }
+
+  pub fn get_blinds(&self) -> (models::Blind, models::Blind) {
+    // small and big
+    let small = models::Blind {
+      player: self.small_blind.player.name.clone(),
+      hand: self.id,
+      amount: self.small_blind.amount,
+      kind: "small".to_string(),
+    };
+    let big = models::Blind {
+      player: self.big_blind.player.name.clone(),
+      hand: self.id,
+      amount: self.big_blind.amount,
+      kind: "big".to_string(),
+    };
+    (small, big)
+  }
+
+  pub fn get_end(&self) -> Vec<models::HoleCard> {
+    let mut vec: Vec<models::HoleCard> = Vec::new();
+    for i in 0..9 {
+      if let Some(cards) = &self.players_card[i] {
+        let player = {
+          let opt = &self.players[i];
+          match opt {
+            Some(p) => p,
+            None => panic!(),
+          }
+        };
+
+        let hole = models::HoleCard {
+          hand: self.id,
+          player: player.name.to_string(),
+          card1: cards[0].to_string(),
+          card2: cards[1].to_string(),
+        };
+        vec.push(hole);
+      }
+    }
+    vec
+  }
 }
 
 #[derive(Debug, PartialEq)]
